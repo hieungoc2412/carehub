@@ -22,6 +22,8 @@ import Modal from '../../../shared/components/Modal.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import SearchableSelect from '../../../shared/components/SearchableSelect.jsx'
 import DateTimePicker24h from '../../../shared/components/DateTimePicker24h.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { adminApi } from '../api/adminApi'
 import { getChecklistDisplayCode } from '../utils/formCode.js'
@@ -202,6 +204,12 @@ function ChecklistAssignmentPage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+  const { sort, toggleSort } = useTableSort(
+    searchParams.get('sortField') && ['asc', 'desc'].includes(searchParams.get('sortDirection'))
+      ? { key: searchParams.get('sortField'), direction: searchParams.get('sortDirection') }
+      : null,
+    () => setPage(0),
+  )
 
   const [formFilters, setFormFilters] = useState({
     ownerDepartmentId: searchParams.get('ownerDepartmentId') || '',
@@ -294,12 +302,20 @@ function ChecklistAssignmentPage() {
   )
 
   const activeFilters = activeTab === TAB_FORMS ? formFilters : assigneeFilters
+  const supportedSortFields = activeTab === TAB_FORMS
+    ? new Set(['formTitle', 'versionNumber', 'ownerDepartmentName', 'recipientCount', 'nearestExpiry'])
+    : new Set(['departmentName', 'formCount', 'nearestExpiry'])
+  const apiTableSort = sort && supportedSortFields.has(sort.key) ? sort : null
 
   useEffect(() => {
     const params = new URLSearchParams()
     params.set('tab', activeTab)
     if (keyword.trim()) params.set('keyword', keyword.trim())
     if (page) params.set('page', String(page))
+    if (sort) {
+      params.set('sortField', sort.key)
+      params.set('sortDirection', sort.direction)
+    }
     Object.entries(activeFilters).forEach(([key, value]) => {
       if (value) params.set(key, value)
     })
@@ -309,7 +325,7 @@ function ChecklistAssignmentPage() {
     if (params.toString() !== searchParams.toString()) {
       setSearchParams(params, { replace: true })
     }
-  }, [activeFilters, activeTab, drawer?.id, drawer?.type, keyword, page, searchParams, setSearchParams])
+  }, [activeFilters, activeTab, drawer?.id, drawer?.type, keyword, page, searchParams, setSearchParams, sort])
 
   useEffect(() => {
     let cancelled = false
@@ -348,6 +364,7 @@ function ChecklistAssignmentPage() {
             expiringSoon: formFilters.expiringSoon || undefined,
             page,
             size: PAGE_SIZE,
+            sort: apiSort(apiTableSort),
           })
           if (!cancelled) setForms(getPageData(response))
         } else {
@@ -358,6 +375,7 @@ function ChecklistAssignmentPage() {
             expiringSoon: assigneeFilters.expiringSoon || undefined,
             page,
             size: PAGE_SIZE,
+            sort: apiSort(apiTableSort),
           })
           if (!cancelled) setAssignees(getPageData(response))
         }
@@ -376,7 +394,7 @@ function ChecklistAssignmentPage() {
     return () => {
       cancelled = true
     }
-  }, [activeTab, assigneeFilters, debouncedKeyword, formFilters, page, refreshKey])
+  }, [activeTab, apiTableSort, assigneeFilters, debouncedKeyword, formFilters, page, refreshKey])
 
   const loadDrawerItems = useCallback(async (nextDrawer = drawer) => {
     if (!nextDrawer) return
@@ -935,11 +953,11 @@ function ChecklistAssignmentPage() {
               <table className="cap-assignment-table">
                 <thead>
                   <tr>
-                    <th>Bảng kiểm</th>
-                    <th>Phiên bản</th>
-                    <th>Khoa sở hữu</th>
-                    <th>Người nhận</th>
-                    <th>Hạn gần nhất</th>
+                    <SortableTableHeader label="Bảng kiểm" field="formTitle" sort={sort} onSort={toggleSort} />
+                    <SortableTableHeader label="Phiên bản" field="versionNumber" sort={sort} onSort={toggleSort} />
+                    <SortableTableHeader label="Khoa sở hữu" field="ownerDepartmentName" sort={sort} onSort={toggleSort} />
+                    <SortableTableHeader label="Người nhận" field="recipientCount" sort={sort} onSort={toggleSort} />
+                    <SortableTableHeader label="Hạn gần nhất" field="nearestExpiry" sort={sort} onSort={toggleSort} />
                     <th>Thao tác</th>
                   </tr>
                 </thead>
@@ -967,10 +985,10 @@ function ChecklistAssignmentPage() {
                 <thead>
                   <tr>
                     <th>Người nhận</th>
-                    <th>Khoa/phòng</th>
+                    <SortableTableHeader label="Khoa/phòng" field="departmentName" sort={sort} onSort={toggleSort} />
                     <th>Vai trò</th>
-                    <th>Bảng kiểm</th>
-                    <th>Hạn gần nhất</th>
+                    <SortableTableHeader label="Bảng kiểm" field="formCount" sort={sort} onSort={toggleSort} />
+                    <SortableTableHeader label="Hạn gần nhất" field="nearestExpiry" sort={sort} onSort={toggleSort} />
                     <th>Thao tác</th>
                   </tr>
                 </thead>

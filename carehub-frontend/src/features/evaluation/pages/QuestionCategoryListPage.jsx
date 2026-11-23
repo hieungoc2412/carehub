@@ -12,6 +12,8 @@ import {
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { questionCategoryApi } from '../api/questionCategoryApi.js'
 import { apiData, apiErrorMessage } from '../utils/documentQuestionUi.js'
@@ -24,6 +26,11 @@ const EMPTY_FORM = {
   description: '',
   status: 'ACTIVE',
 }
+const CATEGORY_SORT_COLUMNS = {
+  name: category => category.name,
+  questionCount: { getValue: category => category.questionCount, type: 'number' },
+  status: category => category.status,
+}
 
 export default function QuestionCategoryListPage() {
   const { showToast } = useToast()
@@ -35,6 +42,7 @@ export default function QuestionCategoryListPage() {
   const [appliedFilters, setAppliedFilters] = useState({ keyword: '', status: '' })
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [page, setPage] = useState(0)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -83,9 +91,13 @@ export default function QuestionCategoryListPage() {
 
   // Pagination calculations
   const pageSize = 10
-  const totalElements = filteredCategories.length
+  const sortedCategories = useMemo(
+    () => sortTableRows(filteredCategories, sort, CATEGORY_SORT_COLUMNS),
+    [filteredCategories, sort],
+  )
+  const totalElements = sortedCategories.length
   const totalPages = Math.ceil(totalElements / pageSize) || 1
-  const displayRows = filteredCategories.slice(page * pageSize, (page + 1) * pageSize)
+  const displayRows = sortedCategories.slice(page * pageSize, (page + 1) * pageSize)
 
   // Modal actions
   const handleOpenCreateModal = () => {
@@ -226,9 +238,9 @@ export default function QuestionCategoryListPage() {
           <table className="qcl-table admin-table-uppercase">
             <thead>
               <tr>
-                <th>Tên danh mục</th>
-                <th>Số câu hỏi</th>
-                <th>Trạng thái</th>
+                <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên danh mục</SortableTableHeader>
+                <SortableTableHeader sortKey="questionCount" sort={sort} onSort={toggleSort}>Số câu hỏi</SortableTableHeader>
+                <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                 <th style={{ width: '120px' }}>Hành động</th>
               </tr>
             </thead>

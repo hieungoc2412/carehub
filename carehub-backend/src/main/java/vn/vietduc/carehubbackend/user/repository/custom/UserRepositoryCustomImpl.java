@@ -6,7 +6,9 @@ import jakarta.persistence.Query;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
+import vn.vietduc.carehubbackend.exception.ValidationException;
 import vn.vietduc.carehubbackend.user.dto.request.UserFilterRequest;
 import vn.vietduc.carehubbackend.user.entity.User;
 
@@ -79,8 +81,8 @@ public class UserRepositoryCustomImpl implements UserRepositoryCustom {
                 params
         );
 
+        sql.append(buildOrderBy(pageable.getSort()));
         sql.append("""
-                ORDER BY u.id DESC
                 LIMIT :limit
                 OFFSET :offset
                 """);
@@ -123,6 +125,26 @@ public class UserRepositoryCustomImpl implements UserRepositoryCustom {
                 pageable,
                 total
         );
+    }
+
+    private String buildOrderBy(Sort sort) {
+        if (sort == null || sort.isUnsorted()) {
+            return " ORDER BY u.id DESC ";
+        }
+        List<String> orders = sort.stream().map(order -> {
+            String expression = switch (order.getProperty()) {
+                case "id" -> "u.id";
+                case "department" -> "(SELECT d.name FROM departments d WHERE d.id = u.department_id)";
+                case "role" -> "(SELECT MIN(r.code) FROM user_roles ur_sort JOIN roles r ON r.id = ur_sort.role_id WHERE ur_sort.user_id = u.id)";
+                case "status" -> "u.status";
+                default -> throw ValidationException.field(
+                        "sort",
+                        "Trường sắp xếp không được hỗ trợ: " + order.getProperty()
+                );
+            };
+            return expression + (order.isDescending() ? " DESC" : " ASC") + " NULLS LAST";
+        }).toList();
+        return " ORDER BY " + String.join(", ", orders) + ", u.id ASC ";
     }
 
     private void appendConditions(

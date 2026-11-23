@@ -8,6 +8,8 @@ import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolba
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import { EditOutlined, PlusCircleOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/ActivityTypeListPage.css'
 
 const EMPTY_FORM = {
@@ -44,6 +46,7 @@ function ActivityTypeListPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -61,7 +64,7 @@ function ActivityTypeListPage() {
         isActive: appliedFilters.status === '' ? undefined : appliedFilters.status === 'true',
         page,
         size: 10,
-        sort: 'sortOrder,asc',
+        sort: apiSort(sort, 'sortOrder,asc'),
       })
       setData(response.data.data)
     } catch (error) {
@@ -69,7 +72,7 @@ function ActivityTypeListPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [appliedFilters, page])
+  }, [appliedFilters, page, sort])
 
   useEffect(() => {
     fetchActivityTypes()
@@ -254,9 +257,9 @@ function ActivityTypeListPage() {
                       <table className="atl-table admin-table-uppercase">
                       <thead>
                         <tr>
-                          <th>Tên cách thức</th>
+                          <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên cách thức</SortableTableHeader>
                           <th>Mô tả</th>
-                          <th>Trạng thái</th>
+                          <SortableTableHeader sortKey="active" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                           <th style={{ width: '96px' }}>Hành động</th>
                         </tr>
                       </thead>

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import TrainingGroupFormPage from './TrainingGroupFormPage'
 import { SearchOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
@@ -17,6 +19,7 @@ function TrainingGroupListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   const loadGroups = useCallback(async () => {
     setIsLoading(true)
@@ -39,9 +42,14 @@ function TrainingGroupListPage() {
   const filteredGroups = useMemo(() => groups, [groups])
 
   const pageSize = 10
-  const totalElements = filteredGroups.length
+  const sortedGroups = useMemo(() => sortTableRows(filteredGroups, sort, {
+    name: group => group.name,
+    memberCount: { getValue: group => group.memberCount, type: 'number' },
+    active: { getValue: group => group.active, type: 'boolean' },
+  }), [filteredGroups, sort])
+  const totalElements = sortedGroups.length
   const totalPages = Math.ceil(totalElements / pageSize) || 1
-  const displayRows = filteredGroups.slice(page * pageSize, (page + 1) * pageSize)
+  const displayRows = sortedGroups.slice(page * pageSize, (page + 1) * pageSize)
 
   const handleCreate = () => {
     setEditingGroup(null)
@@ -93,10 +101,10 @@ function TrainingGroupListPage() {
         <table className="ch-table">
           <thead>
             <tr>
-              <th>Tên nhóm</th>
+              <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên nhóm</SortableTableHeader>
               <th>Mô tả</th>
-              <th>Số thành viên</th>
-              <th>Trạng thái</th>
+              <SortableTableHeader sortKey="memberCount" sort={sort} onSort={toggleSort}>Số thành viên</SortableTableHeader>
+              <SortableTableHeader sortKey="active" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
               <th>Thao tác</th>
             </tr>
           </thead>

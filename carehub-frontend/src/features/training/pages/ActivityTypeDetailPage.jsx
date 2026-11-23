@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { trainingApi } from '../api/trainingApi.js'
 import { getApiErrorMessage } from '../../../shared/api/apiError.js'
 import AppShell from '../../../shared/components/AppShell.jsx'
 import LoadingState from '../../../shared/components/LoadingState.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/training.css'
 
 function ActivityTypeDetailPage() {
@@ -11,6 +13,13 @@ function ActivityTypeDetailPage() {
   const [activityType, setActivityType] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const { sort, toggleSort } = useTableSort()
+  const recentRecords = useMemo(() => sortTableRows(activityType?.recentRecords || [], sort, {
+    title: record => record.title,
+    startDate: { getValue: record => record.startDate, type: 'date' },
+    declaredHours: { getValue: record => record.declaredHours, type: 'number' },
+    workflowStatus: record => record.workflowStatus,
+  }), [activityType, sort])
 
   const fetchDetail = useCallback(async () => {
     setIsLoading(true)
@@ -149,15 +158,15 @@ function ActivityTypeDetailPage() {
                       <table className="training-table">
                         <thead>
                           <tr>
-                            <th>Tên chuyên đề / Khóa học</th>
+                            <SortableTableHeader label="Tên chuyên đề / Khóa học" field="title" sort={sort} onSort={toggleSort} />
                             <th>Nhân viên</th>
-                            <th>Ngày bắt đầu</th>
-                            <th>Số giờ khai báo</th>
-                            <th>Trạng thái</th>
+                            <SortableTableHeader label="Ngày bắt đầu" field="startDate" sort={sort} onSort={toggleSort} />
+                            <SortableTableHeader label="Số giờ khai báo" field="declaredHours" sort={sort} onSort={toggleSort} />
+                            <SortableTableHeader label="Trạng thái" field="workflowStatus" sort={sort} onSort={toggleSort} />
                           </tr>
                         </thead>
                         <tbody>
-                          {activityType.recentRecords.map((record) => (
+                          {recentRecords.map((record) => (
                             <tr key={record.id}>
                               <td>{record.title}</td>
                               <td>{record.employeeCode} - {record.employeeName}</td>

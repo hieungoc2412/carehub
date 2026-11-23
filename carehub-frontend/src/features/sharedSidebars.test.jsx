@@ -108,7 +108,9 @@ describe('staff Sidebar', () => {
     ))).toBe(true)
 
     await waitFor(() => expect(staffApi.getAssignedForms).toHaveBeenCalledWith({ page: 0, size: 1 }))
-    await waitFor(() => expect(screen.getAllByText('4').length).toBeGreaterThan(0))
+    const assignedBadge = await screen.findByLabelText('4 bảng kiểm được giao')
+    expect(assignedBadge).toHaveClass('sidebar__item-badge')
+    expect(assignedBadge).toHaveTextContent('4')
 
     const nav = screen.getByLabelText('Điều hướng chính').querySelector('.sidebar__nav')
     Object.defineProperty(nav, 'scrollTop', { configurable: true, value: 52, writable: true })

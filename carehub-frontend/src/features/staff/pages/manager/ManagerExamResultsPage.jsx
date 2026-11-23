@@ -1,9 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SearchOutlined, EyeOutlined, LoadingOutlined } from '@ant-design/icons'
 import AppShell from '../../../../shared/components/AppShell.jsx'
 import { examAssignmentApi } from '../../../../features/evaluation/api/examAssignmentApi'
 import '../../styles/ManagerPages.css'
+import SortableTableHeader from '../../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../../shared/utils/tableSort.js'
+
+const EXAM_SORT_COLUMNS = {
+  name: item => item.name || item.title || item.examTitle,
+  createdAt: { getValue: item => item.createdAt, type: 'date' },
+  status: item => item.status,
+  dueAt: { getValue: item => item.dueAt, type: 'date' },
+}
 
 function ManagerExamResultsPage() {
   const navigate = useNavigate()
@@ -11,6 +20,11 @@ function ManagerExamResultsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
+  const { sort, toggleSort } = useTableSort()
+  const displayedAssignments = useMemo(
+    () => sortTableRows(assignments, sort, EXAM_SORT_COLUMNS),
+    [assignments, sort],
+  )
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350)
@@ -62,15 +76,15 @@ function ManagerExamResultsPage() {
         <table className="mgr-table mgr-table--cards">
           <thead>
             <tr>
-              <th>Tên kỳ thi</th>
-              <th>Ngày tạo</th>
-              <th>Trạng thái</th>
-              <th>Hạn nộp</th>
+              <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên kỳ thi</SortableTableHeader>
+              <SortableTableHeader sortKey="createdAt" sort={sort} onSort={toggleSort}>Ngày tạo</SortableTableHeader>
+              <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
+              <SortableTableHeader sortKey="dueAt" sort={sort} onSort={toggleSort}>Hạn nộp</SortableTableHeader>
               <th style={{ width: 80, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            {assignments.map((item) => (
+            {displayedAssignments.map((item) => (
               <tr key={item.id}>
                 <td data-label="Tên kỳ thi" style={{ fontWeight: 600, color: '#0f172a' }}>{item.name || item.title || item.examTitle || `Kỳ thi #${item.id}`}</td>
                 <td data-label="Ngày tạo" style={{ color: '#475569' }}>

@@ -161,7 +161,11 @@ public class FormAssignmentService {
             boolean expiringSoon,
             Pageable pageable) {
         Instant now = Instant.now(clock);
-        return itemRepository.searchAssignedForms(
+        boolean sorted = pageable.getSort().isSorted();
+        if (pageable.getPageSize() < 1 || pageable.getPageSize() > MAX_PAGE_SIZE) {
+            throw ValidationException.field("size", "Page size must be between 1 and " + MAX_PAGE_SIZE);
+        }
+        var projectionPage = itemRepository.searchAssignedForms(
                 like(keyword),
                 ownerDepartmentId,
                 expiringSoon,
@@ -170,7 +174,13 @@ public class FormAssignmentService {
                 FormVersionStatus.PUBLISHED,
                 now,
                 now.plus(Duration.ofDays(7)),
-                normalizeUnsorted(pageable))
+                sorted ? Pageable.unpaged() : normalizeUnsorted(pageable));
+        if (!sorted) return projectionPage.map(row -> FormAssignmentFormRowResponse.builder()
+                .formId(row.getFormId()).formCode(row.getFormCode()).formTitle(row.getFormTitle())
+                .formVersionId(row.getFormVersionId()).versionNumber(row.getVersionNumber())
+                .ownerDepartmentId(row.getOwnerDepartmentId()).ownerDepartmentName(row.getOwnerDepartmentName())
+                .recipientCount(row.getRecipientCount()).nearestExpiry(row.getNearestExpiry()).build());
+        List<FormAssignmentFormRowResponse> rows = projectionPage.stream()
                 .map(row -> FormAssignmentFormRowResponse.builder()
                         .formId(row.getFormId())
                         .formCode(row.getFormCode())
@@ -180,8 +190,8 @@ public class FormAssignmentService {
                         .ownerDepartmentId(row.getOwnerDepartmentId())
                         .ownerDepartmentName(row.getOwnerDepartmentName())
                         .recipientCount(row.getRecipientCount())
-                        .nearestExpiry(row.getNearestExpiry())
-                        .build());
+                        .nearestExpiry(row.getNearestExpiry()).build()).toList();
+        return pageSorted(rows, pageable, formDashboardComparator(pageable.getSort()));
     }
 
     @Transactional(readOnly = true)
@@ -192,7 +202,11 @@ public class FormAssignmentService {
             boolean expiringSoon,
             Pageable pageable) {
         Instant now = Instant.now(clock);
-        return itemRepository.searchAssignedAssignees(
+        boolean sorted = pageable.getSort().isSorted();
+        if (pageable.getPageSize() < 1 || pageable.getPageSize() > MAX_PAGE_SIZE) {
+            throw ValidationException.field("size", "Page size must be between 1 and " + MAX_PAGE_SIZE);
+        }
+        var projectionPage = itemRepository.searchAssignedAssignees(
                 like(keyword),
                 departmentId,
                 cleanRole(roleCode),
@@ -202,7 +216,13 @@ public class FormAssignmentService {
                 FormVersionStatus.PUBLISHED,
                 now,
                 now.plus(Duration.ofDays(7)),
-                normalizeUnsorted(pageable))
+                sorted ? Pageable.unpaged() : normalizeUnsorted(pageable));
+        if (!sorted) return projectionPage.map(row -> FormAssignmentAssigneeRowResponse.builder()
+                .assigneeId(row.getAssigneeId()).employeeCode(row.getEmployeeCode()).fullName(row.getFullName())
+                .departmentId(row.getDepartmentId()).departmentName(row.getDepartmentName())
+                .roleCodes(roleCodes(row.getAssigneeId())).formCount(row.getFormCount())
+                .nearestExpiry(row.getNearestExpiry()).build());
+        List<FormAssignmentAssigneeRowResponse> rows = projectionPage.stream()
                 .map(row -> FormAssignmentAssigneeRowResponse.builder()
                         .assigneeId(row.getAssigneeId())
                         .employeeCode(row.getEmployeeCode())
@@ -211,8 +231,8 @@ public class FormAssignmentService {
                         .departmentName(row.getDepartmentName())
                         .roleCodes(roleCodes(row.getAssigneeId()))
                         .formCount(row.getFormCount())
-                        .nearestExpiry(row.getNearestExpiry())
-                        .build());
+                        .nearestExpiry(row.getNearestExpiry()).build()).toList();
+        return pageSorted(rows, pageable, assigneeDashboardComparator(pageable.getSort()));
     }
 
     @Transactional(readOnly = true)
@@ -889,6 +909,53 @@ public class FormAssignmentService {
             throw ValidationException.field("size", "Page size must be between 1 and " + MAX_PAGE_SIZE);
         }
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("id").descending());
+    }
+
+    private Comparator<FormAssignmentFormRowResponse> formDashboardComparator(Sort sort) {
+        Comparator<FormAssignmentFormRowResponse> comparator = null;
+        for (Sort.Order order : sort) {
+            Comparator<FormAssignmentFormRowResponse> next = switch (order.getProperty()) {
+                case "formTitle" -> comparingNullable(FormAssignmentFormRowResponse::formTitle, order);
+                case "versionNumber" -> comparingNullable(FormAssignmentFormRowResponse::versionNumber, order);
+                case "ownerDepartmentName" -> comparingNullable(FormAssignmentFormRowResponse::ownerDepartmentName, order);
+                case "recipientCount" -> comparingNullable(FormAssignmentFormRowResponse::recipientCount, order);
+                case "nearestExpiry" -> comparingNullable(FormAssignmentFormRowResponse::nearestExpiry, order);
+                default -> throw ValidationException.field("sort", "Trường sắp xếp danh sách bảng kiểm không được hỗ trợ: " + order.getProperty());
+            };
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        return (comparator == null ? Comparator.comparing(FormAssignmentFormRowResponse::formId) : comparator)
+                .thenComparing(FormAssignmentFormRowResponse::formId);
+    }
+
+    private Comparator<FormAssignmentAssigneeRowResponse> assigneeDashboardComparator(Sort sort) {
+        Comparator<FormAssignmentAssigneeRowResponse> comparator = null;
+        for (Sort.Order order : sort) {
+            Comparator<FormAssignmentAssigneeRowResponse> next = switch (order.getProperty()) {
+                case "departmentName" -> comparingNullable(FormAssignmentAssigneeRowResponse::departmentName, order);
+                case "formCount" -> comparingNullable(FormAssignmentAssigneeRowResponse::formCount, order);
+                case "nearestExpiry" -> comparingNullable(FormAssignmentAssigneeRowResponse::nearestExpiry, order);
+                default -> throw ValidationException.field("sort", "Trường sắp xếp danh sách người nhận không được hỗ trợ: " + order.getProperty());
+            };
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        return (comparator == null ? Comparator.comparing(FormAssignmentAssigneeRowResponse::assigneeId) : comparator)
+                .thenComparing(FormAssignmentAssigneeRowResponse::assigneeId);
+    }
+
+    private <T, U extends Comparable<? super U>> Comparator<T> comparingNullable(
+            java.util.function.Function<T, U> getter, Sort.Order order) {
+        Comparator<U> valueComparator = order.isAscending()
+                ? Comparator.nullsLast(Comparator.naturalOrder())
+                : Comparator.nullsLast(Comparator.reverseOrder());
+        return Comparator.comparing(getter, valueComparator);
+    }
+
+    private <T> Page<T> pageSorted(List<T> rows, Pageable pageable, Comparator<T> comparator) {
+        List<T> sorted = rows.stream().sorted(comparator).toList();
+        int from = Math.min((int) pageable.getOffset(), sorted.size());
+        int to = Math.min(from + pageable.getPageSize(), sorted.size());
+        return new PageImpl<>(sorted.subList(from, to), pageable, sorted.size());
     }
 
     private Pageable normalizeUnsorted(Pageable pageable) {

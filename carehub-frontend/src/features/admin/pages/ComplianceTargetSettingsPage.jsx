@@ -9,7 +9,9 @@ import {
 import AppShell from '../../../shared/components/AppShell.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
 import { apiData, apiErrorMessage } from '../../../shared/utils/apiUi.js'
+import { apiSort, sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { adminApi } from '../api/adminApi.js'
 import { getChecklistDisplayCode } from '../utils/formCode.js'
 import { ComplianceTargetModal } from './ChecklistQualityDashboardPage.jsx'
@@ -94,6 +96,8 @@ function ComplianceTargetSettingsPage() {
   const [error, setError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const [targetModalForm, setTargetModalForm] = useState(null)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
+  const sortsByTarget = sort?.key === 'hospitalTargetPercent' || sort?.key === 'departmentTargetCount'
 
   useEffect(() => {
     setPage(0)
@@ -121,31 +125,65 @@ function ComplianceTargetSettingsPage() {
     let active = true
     setLoading(true)
     setError('')
-    adminApi.getForms({
-      page,
-      size: PAGE_SIZE,
-      sort: 'updatedAt,desc',
-      keyword: appliedKeyword || undefined,
-      status: statusFilter || undefined,
-    }).then((response) => {
-      if (!active) return
-      const nextPage = pageContent(response)
-      setForms(nextPage.content)
-      setTotalElements(nextPage.totalElements)
-      setTotalPages(nextPage.totalPages)
-    }).catch((requestError) => {
-      if (!active) return
-      setForms([])
-      setTotalElements(0)
-      setTotalPages(0)
-      setError(apiErrorMessage(requestError))
-    }).finally(() => {
-      if (active) setLoading(false)
-    })
+    const loadForms = async () => {
+      try {
+        const commonParams = {
+          keyword: appliedKeyword || undefined,
+          status: statusFilter || undefined,
+        }
+        if (!sortsByTarget) {
+          const response = await adminApi.getForms({
+            ...commonParams,
+            page,
+            size: PAGE_SIZE,
+            sort: apiSort(sort, 'updatedAt,desc'),
+          })
+          if (!active) return
+          const nextPage = pageContent(response)
+          setForms(nextPage.content)
+          setTotalElements(nextPage.totalElements)
+          setTotalPages(nextPage.totalPages)
+          return
+        }
+
+        const firstResponse = await adminApi.getForms({ ...commonParams, page: 0, size: 100 })
+        const firstPage = pageContent(firstResponse)
+        const remaining = await Promise.all(Array.from(
+          { length: Math.max(0, firstPage.totalPages - 1) },
+          (_, index) => adminApi.getForms({ ...commonParams, page: index + 1, size: 100 }),
+        ))
+        const allForms = [firstPage.content, ...remaining.map(response => pageContent(response).content)].flat()
+        const targetResults = await Promise.allSettled(allForms.map(form => adminApi.getComplianceTargets(form.id)))
+        const nextTargets = {}
+        targetResults.forEach((result, index) => {
+          if (result.status === 'fulfilled') nextTargets[allForms[index].id] = normalizeTargetConfig(result.value)
+        })
+        const sortedForms = sortTableRows(allForms, sort, {
+          hospitalTargetPercent: form => nextTargets[form.id]?.hospitalTargetPercent ?? 80,
+          departmentTargetCount: form => nextTargets[form.id]?.departmentTargetCount ?? 0,
+        })
+        if (!active) return
+        const from = page * PAGE_SIZE
+        setTargetsByFormId(nextTargets)
+        setForms(sortedForms.slice(from, from + PAGE_SIZE))
+        setTotalElements(sortedForms.length)
+        setTotalPages(Math.ceil(sortedForms.length / PAGE_SIZE))
+      } catch (requestError) {
+        if (!active) return
+        setForms([])
+        setTotalElements(0)
+        setTotalPages(0)
+        setError(apiErrorMessage(requestError))
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    loadForms()
     return () => { active = false }
-  }, [appliedKeyword, page, reloadKey, statusFilter])
+  }, [appliedKeyword, page, reloadKey, sort, sortsByTarget, statusFilter])
 
   useEffect(() => {
+    if (sortsByTarget) return undefined
     if (!forms.length) {
       setTargetsByFormId({})
       return undefined
@@ -167,7 +205,7 @@ function ComplianceTargetSettingsPage() {
         if (active) setTargetLoading(false)
       })
     return () => { active = false }
-  }, [forms])
+  }, [forms, sortsByTarget])
 
   const resultFrom = totalElements === 0 ? 0 : page * PAGE_SIZE + 1
   const resultTo = Math.min((page + 1) * PAGE_SIZE, totalElements)
@@ -253,11 +291,11 @@ function ComplianceTargetSettingsPage() {
           <table className="checklist-target-settings__table admin-table-uppercase">
             <thead>
               <tr>
-                <th className="checklist-target-settings__col-form">Bảng kiểm</th>
-                <th className="checklist-target-settings__col-version">Phiên bản</th>
-                <th className="checklist-target-settings__col-status">Trạng thái</th>
-                <th className="checklist-target-settings__col-hospital">Mục tiêu bệnh viện</th>
-                <th className="checklist-target-settings__col-department">Mục tiêu khoa/phòng</th>
+                <SortableTableHeader className="checklist-target-settings__col-form" label="Bảng kiểm" field="title" sort={sort} onSort={toggleSort} />
+                <SortableTableHeader className="checklist-target-settings__col-version" label="Phiên bản" field="versionNumber" sort={sort} onSort={toggleSort} />
+                <SortableTableHeader className="checklist-target-settings__col-status" label="Trạng thái" field="status" sort={sort} onSort={toggleSort} />
+                <SortableTableHeader className="checklist-target-settings__col-hospital" label="Mục tiêu bệnh viện" field="hospitalTargetPercent" sort={sort} onSort={toggleSort} />
+                <SortableTableHeader className="checklist-target-settings__col-department" label="Mục tiêu khoa/phòng" field="departmentTargetCount" sort={sort} onSort={toggleSort} />
                 <th className="checklist-target-settings__col-actions">Hành động</th>
               </tr>
             </thead>

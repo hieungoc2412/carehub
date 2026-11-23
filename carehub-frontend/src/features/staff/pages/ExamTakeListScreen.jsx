@@ -10,6 +10,17 @@ import { myExamApi } from '../../evaluation/api/myExamApi.js'
 import { apiData, apiErrorMessage, formatDateTime, formatNumber } from '../../../shared/utils/apiUi.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { validateHistoricalDateRange } from '../../../shared/utils/dateRange.js'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
+
+const ASSIGNMENT_SORT_COLUMNS = {
+  name: assignment => assignment.name,
+  dueAt: { getValue: assignment => assignment.dueAt, type: 'date' },
+  usedAttempts: { getValue: assignment => assignment.usedAttempts, type: 'number' },
+  passingScore: { getValue: assignment => assignment.passingScore, type: 'number' },
+  bestScore: { getValue: assignment => assignment.bestScore, type: 'number' },
+  assessmentStatus: assignment => assignment.assessmentStatus,
+}
 
 export default function ExamTakeListScreen() {
   const navigate = useNavigate()
@@ -27,6 +38,7 @@ export default function ExamTakeListScreen() {
   const [loading, setLoading] = useState(true)
   const [startingId, setStartingId] = useState(null)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const { sort, toggleSort } = useTableSort()
 
   useEffect(() => {
     const timer = window.setTimeout(async () => {
@@ -51,6 +63,10 @@ export default function ExamTakeListScreen() {
     failed: filtered.filter(item => item.assessmentStatus === 'FAILED').length,
     notTaken: filtered.filter(item => item.assessmentStatus === 'NOT_TAKEN').length,
   }), [filtered])
+  const displayedAssignments = useMemo(
+    () => sortTableRows(filtered, sort, ASSIGNMENT_SORT_COLUMNS),
+    [filtered, sort],
+  )
   const activeFilterCount = Number(Boolean(fromDate)) + Number(Boolean(toDate))
 
   const applyDateFilters = () => {
@@ -183,8 +199,16 @@ export default function ExamTakeListScreen() {
           <col className="eh-take-table__status-col" />
           <col className="eh-take-table__action-col" />
         </colgroup>
-        <thead><tr><th>Tên bài kiểm tra</th><th>Thời hạn hoàn thành</th><th>Lượt làm bài</th><th>Điểm đạt <small>/10</small></th><th>Điểm cao nhất <small>/10</small></th><th>Đánh giá</th><th>Hành động</th></tr></thead><tbody>
-        {loading ? <tr><td colSpan="7">Đang tải bài kiểm tra...</td></tr> : filtered.length === 0 ? <tr><td colSpan="7">{assignments.length === 0 ? 'Bạn chưa được giao bài kiểm tra nào.' : 'Không có bài kiểm tra khớp bộ lọc đã chọn.'}</td></tr> : filtered.map(item => <tr key={item.id} className={item.assessmentStatus === 'FAILED' ? 'eh-row--danger' : ''}>
+        <thead><tr>
+          <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên bài kiểm tra</SortableTableHeader>
+          <SortableTableHeader sortKey="dueAt" sort={sort} onSort={toggleSort}>Thời hạn hoàn thành</SortableTableHeader>
+          <SortableTableHeader sortKey="usedAttempts" sort={sort} onSort={toggleSort}>Lượt làm bài</SortableTableHeader>
+          <SortableTableHeader sortKey="passingScore" sort={sort} onSort={toggleSort}>Điểm đạt <small>/10</small></SortableTableHeader>
+          <SortableTableHeader sortKey="bestScore" sort={sort} onSort={toggleSort}>Điểm cao nhất <small>/10</small></SortableTableHeader>
+          <SortableTableHeader sortKey="assessmentStatus" sort={sort} onSort={toggleSort}>Đánh giá</SortableTableHeader>
+          <th>Hành động</th>
+        </tr></thead><tbody>
+        {loading ? <tr><td colSpan="7">Đang tải bài kiểm tra...</td></tr> : displayedAssignments.length === 0 ? <tr><td colSpan="7">{assignments.length === 0 ? 'Bạn chưa được giao bài kiểm tra nào.' : 'Không có bài kiểm tra khớp bộ lọc đã chọn.'}</td></tr> : displayedAssignments.map(item => <tr key={item.id} className={item.assessmentStatus === 'FAILED' ? 'eh-row--danger' : ''}>
           <td data-label="Tên bài kiểm tra"><strong>{item.name}</strong></td><td data-label="Thời hạn">{formatDateTime(item.dueAt)}</td>
           <td data-label="Lượt làm bài"><span className="eh-attempt-cell">
             <span className="eh-attempt-count">{item.usedAttempts ?? 0}/{item.maxAttempts ?? '—'}</span>

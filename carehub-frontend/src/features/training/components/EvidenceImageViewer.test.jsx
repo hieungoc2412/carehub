@@ -80,6 +80,24 @@ describe('EvidenceImageViewer', () => {
     expect(screen.getByRole('button', { name: 'Đóng ảnh minh chứng' })).toHaveFocus()
   })
 
+  it('rotates left and right at fit while keeping the full image in view', () => {
+    render(<EvidenceImageViewer filename="chứng-chỉ.jpg" src="blob:image" onClose={vi.fn()} />)
+    const rotateLeft = screen.getByRole('button', { name: 'Xoay trái 90 độ' })
+    const rotateRight = screen.getByRole('button', { name: 'Xoay phải 90 độ' })
+    expect(rotateLeft).toBeDisabled()
+    const image = loadImage()
+    expect(rotateRight).toBeEnabled()
+
+    fireEvent.click(rotateRight)
+    expect(image.style.transform).toContain('rotate(90deg)')
+    expect(image).toHaveStyle({ width: '600px', height: '300px' })
+    expect(screen.getByLabelText('Mức phóng to')).toHaveTextContent('100%')
+
+    fireEvent.click(rotateLeft)
+    expect(image.style.transform).toContain('rotate(0deg)')
+    expect(image).toHaveStyle({ width: '800px', height: '400px' })
+  })
+
   it('shows loading and URL errors with retry, and recovers from an image load error', () => {
     const retry = vi.fn()
     const view = render(<EvidenceImageViewer filename="chứng-chỉ.jpg" loading onRetry={retry} onClose={vi.fn()} />)

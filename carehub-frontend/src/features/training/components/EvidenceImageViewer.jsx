@@ -1,6 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CloseOutlined, ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons'
+import {
+  CloseOutlined,
+  RotateLeftOutlined,
+  RotateRightOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
+} from '@ant-design/icons'
 import { constrainView, FIT_VIEW, fitImage, zoomImage } from '../utils/imageViewport.js'
 import '../styles/EvidenceImageViewer.css'
 
@@ -10,9 +16,17 @@ function ImageContent({ src, filename, loading, error, onRetry }) {
   const [frame, setFrame] = useState({ width: 0, height: 0 })
   const [image, setImage] = useState({ width: 0, height: 0 })
   const [view, setView] = useState(FIT_VIEW)
+  const [rotation, setRotation] = useState(0)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
-  const fitted = useMemo(() => fitImage(image, frame), [image, frame])
+  const quarterTurn = rotation % 180 !== 0
+  const orientedImage = useMemo(() => quarterTurn
+    ? { width: image.height, height: image.width }
+    : image, [image, quarterTurn])
+  const fitted = useMemo(() => fitImage(orientedImage, frame), [orientedImage, frame])
+  const renderedSize = useMemo(() => quarterTurn
+    ? { width: fitted.height, height: fitted.width }
+    : fitted, [fitted, quarterTurn])
   const ready = Boolean(src && !loading && !error && !failed && fitted.width)
 
   useEffect(() => {
@@ -46,6 +60,11 @@ function ImageContent({ src, filename, loading, error, onRetry }) {
   const zoom = (delta) => setView(current => zoomImage(current, current.zoom + delta, fitted, frame))
   const reset = () => {
     pointersRef.current.clear()
+    setView(FIT_VIEW)
+  }
+  const rotate = (delta) => {
+    pointersRef.current.clear()
+    setRotation(current => (current + delta + 360) % 360)
     setView(FIT_VIEW)
   }
   const point = (event) => {
@@ -86,6 +105,9 @@ function ImageContent({ src, filename, loading, error, onRetry }) {
         <button type="button" onClick={() => zoom(-0.25)} disabled={!ready || view.zoom <= 1} aria-label="Thu nhỏ"><ZoomOutOutlined aria-hidden="true" /></button>
         <output aria-label="Mức phóng to">{Math.round(view.zoom * 100)}%</output>
         <button type="button" onClick={() => zoom(0.25)} disabled={!ready || view.zoom >= 5} aria-label="Phóng to"><ZoomInOutlined aria-hidden="true" /></button>
+        <span className="evidence-image-viewer__toolbar-separator" aria-hidden="true" />
+        <button type="button" onClick={() => rotate(-90)} disabled={!ready} aria-label="Xoay trái 90 độ" title="Xoay trái 90 độ"><RotateLeftOutlined aria-hidden="true" /></button>
+        <button type="button" onClick={() => rotate(90)} disabled={!ready} aria-label="Xoay phải 90 độ" title="Xoay phải 90 độ"><RotateRightOutlined aria-hidden="true" /></button>
         <button type="button" onClick={reset} disabled={!ready}>Vừa khung</button>
       </div>
       <div
@@ -109,7 +131,12 @@ function ImageContent({ src, filename, loading, error, onRetry }) {
             draggable={false}
             onLoad={(event) => setImage({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })}
             onError={() => setFailed(true)}
-            style={{ width: fitted.width, height: fitted.height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, visibility: ready ? 'visible' : 'hidden' }}
+            style={{
+              width: renderedSize.width,
+              height: renderedSize.height,
+              transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom}) rotate(${rotation}deg)`,
+              visibility: ready ? 'visible' : 'hidden',
+            }}
           />
         )}
         {error || failed ? (
@@ -125,7 +152,7 @@ function ImageContent({ src, filename, loading, error, onRetry }) {
           </div>
         ) : !ready && <p className="evidence-image-viewer__state" role="status">Đang tải ảnh...</p>}
       </div>
-      <p className="evidence-image-viewer__hint">Cuộn hoặc chụm hai ngón để zoom. Kéo để di chuyển ảnh đã phóng to.</p>
+      <p className="evidence-image-viewer__hint">Cuộn hoặc chụm hai ngón để zoom. Kéo để di chuyển ảnh đã phóng to; dùng nút xoay để đổi hướng ảnh.</p>
     </>
   )
 }

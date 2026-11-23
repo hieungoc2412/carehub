@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DownloadOutlined, EyeOutlined, LoadingOutlined, SearchOutlined } from '@ant-design/icons'
 import { trainingApi } from '../api/trainingApi'
@@ -6,6 +6,16 @@ import { downloadCsv, exportFileName } from '../../../shared/utils/tableExport.j
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FilterActionButtons from '../../../shared/components/FilterActionButtons.jsx'
 import '../styles/DepartmentTrainingStaffTable.css'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
+
+const EMPLOYEE_SORT_COLUMNS = {
+  employeeCode: employee => employee.employeeCode,
+  jobPositionName: employee => employee.jobPositionName,
+  departmentName: employee => employee.departmentName,
+  submittedHours: { getValue: employee => employee.submittedHours, type: 'number' },
+  complianceStatus: employee => employee.complianceStatus,
+}
 
 const STATUS_TEXT = {
   COMPLIANT: 'Đạt',
@@ -71,6 +81,7 @@ export default function DepartmentTrainingStaffTable({
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const { sort, toggleSort } = useTableSort()
 
   useEffect(() => {
     const handler = window.setTimeout(() => setDebouncedSearch(search), 400)
@@ -88,6 +99,7 @@ export default function DepartmentTrainingStaffTable({
         ? (externalFilters?.complianceStatus || undefined)
         : (statusFilter !== 'all' ? statusFilter : undefined),
     }
+    if (sort) params.sort = apiSort(sort)
 
     // Add extra external filters if provided
     if (hideToolbar && externalFilters) {
@@ -95,22 +107,38 @@ export default function DepartmentTrainingStaffTable({
       if (externalFilters.professionalFieldId) params.professionalFieldId = externalFilters.professionalFieldId
     }
 
-    trainingApi.getEmployeeTrainingStatuses(params)
-      .then((response) => {
+    const loadEmployees = async () => {
+      try {
+        const response = await trainingApi.getEmployeeTrainingStatuses(params)
         if (cancelled) return
-        setEmployees(response.data?.data?.content || [])
+        const firstPage = response.data?.data || {}
+        const totalPages = Math.max(1, Number(firstPage.totalPages) || 1)
+        const remaining = totalPages > 1 ? await Promise.all(Array.from(
+          { length: totalPages - 1 },
+          (_, index) => trainingApi.getEmployeeTrainingStatuses({ ...params, page: index + 1 }),
+        )) : []
+        if (cancelled) return
+        setEmployees([
+          ...(firstPage.content || []),
+          ...remaining.flatMap(item => item.data?.data?.content || []),
+        ])
         setError(null)
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return
         setError('Không thể tải danh sách nhân sự trong khoa.')
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+    loadEmployees()
 
     return () => { cancelled = true }
-  }, [debouncedSearch, pageSize, statusFilter, hideToolbar, externalFilters])
+  }, [debouncedSearch, pageSize, statusFilter, hideToolbar, externalFilters, sort])
+
+  const displayedEmployees = useMemo(
+    () => sortTableRows(employees, sort, EMPLOYEE_SORT_COLUMNS, employee => employee.employeeId),
+    [employees, sort],
+  )
 
   return (
     <div className="dtst">
@@ -172,17 +200,17 @@ export default function DepartmentTrainingStaffTable({
           <table className="dtst__table">
             <thead>
               <tr>
-                <th>Mã NV</th>
+                <SortableTableHeader sortKey="employeeCode" sort={sort} onSort={toggleSort}>Mã NV</SortableTableHeader>
                 <th>Họ và tên</th>
-                <th>Chức danh</th>
-                <th>Khoa / Phòng</th>
-                <th>Giờ đào tạo</th>
-                <th>Trạng thái</th>
+                <SortableTableHeader sortKey="jobPositionName" sort={sort} onSort={toggleSort}>Chức danh</SortableTableHeader>
+                <SortableTableHeader sortKey="departmentName" sort={sort} onSort={toggleSort}>Khoa / Phòng</SortableTableHeader>
+                <SortableTableHeader sortKey="submittedHours" sort={sort} onSort={toggleSort}>Giờ đào tạo</SortableTableHeader>
+                <SortableTableHeader sortKey="complianceStatus" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                 <th className="dtst__col-action">Thao tác</th>
               </tr>
             </thead>
             <tbody>
-              {employees.map((employee) => (
+              {displayedEmployees.map((employee) => (
                 <tr key={employee.employeeId}>
                   <td data-label="Mã NV" className="dtst__code">{employee.employeeCode}</td>
                   <td data-label="Họ và tên" className="dtst__name">{employee.employeeName}</td>

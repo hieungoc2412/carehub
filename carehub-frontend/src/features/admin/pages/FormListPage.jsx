@@ -2,8 +2,6 @@ import { matchesSearch } from '../../../shared/utils/searchText.js'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  CaretDownOutlined,
-  CaretUpOutlined,
   DeleteOutlined,
   DownOutlined,
   ExclamationCircleOutlined,
@@ -21,6 +19,8 @@ import { resolveChecklistSearchKeyword } from '../utils/formCode.js'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/FormListPage.css'
 
 const PAGE_SIZE = 10
@@ -174,7 +174,6 @@ function FormListPage() {
     action: 'retire',
   })
   const [restoringFormId, setRestoringFormId] = useState(null)
-  const [responseSort, setResponseSort] = useState(null)
   const [forms, setForms] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
@@ -183,6 +182,7 @@ function FormListPage() {
   const [deletingFormId, setDeletingFormId] = useState(null)
   const [totalElements, setTotalElements] = useState(0)
   const [page, setPage] = useState(1)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(1))
   const [totalPages, setTotalPages] = useState(0)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('all')
@@ -228,7 +228,7 @@ function FormListPage() {
     const params = {
       page: page - 1,
       size: PAGE_SIZE,
-      sort: 'updatedAt,desc',
+      sort: apiSort(sort, 'updatedAt,desc'),
       keyword: appliedFilters.keyword || undefined,
       status: appliedFilters.status !== 'all' ? appliedFilters.status : undefined,
       ownerDepartmentId: appliedFilters.departmentId !== 'all' ? Number(appliedFilters.departmentId) : undefined,
@@ -291,28 +291,9 @@ function FormListPage() {
     return () => {
       ignoreResponse = true
     }
-  }, [appliedFilters, page, refreshKey])
+  }, [appliedFilters, page, refreshKey, sort])
 
-  const toggleResponseSort = () => {
-    setResponseSort((current) => {
-      if (current === 'desc') return 'asc'
-      if (current === 'asc') return null
-      return 'desc'
-    })
-  }
-
-  const displayForms = useMemo(() => {
-    if (!responseSort) return forms
-    return [...forms].sort((a, b) => {
-      const countA = Number(a.responseCount ?? a.submissionCount ?? 0)
-      const countB = Number(b.responseCount ?? b.submissionCount ?? 0)
-      if (responseSort === 'asc') {
-        return countA - countB
-      } else {
-        return countB - countA
-      }
-    })
-  }, [forms, responseSort])
+  const displayForms = forms
 
   const visiblePages = useMemo(
     () => getVisiblePages(page, totalPages),
@@ -656,45 +637,13 @@ function FormListPage() {
                   <table className="flp-table">
                     <thead>
                       <tr>
-                        <th className="flp-col-name">Tên quy trình</th>
-                        <th className="flp-col-version">Phiên bản</th>
-                        <th className="flp-col-created">Ngày tạo</th>
-                        <th className="flp-col-assignees">Người được giao</th>
-                        <th
-                          className="flp-col-responses flp-col-sortable"
-                          onClick={toggleResponseSort}
-                          style={{ cursor: 'pointer', userSelect: 'none' }}
-                          title="Nhấn để sắp xếp theo lượt đánh giá"
-                        >
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            <span>Lượt đánh giá</span>
-                            <span
-                              className="flp-sort-icons"
-                              style={{
-                                display: 'inline-flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '9px',
-                                lineHeight: 1,
-                              }}
-                            >
-                              <CaretUpOutlined
-                                style={{
-                                  color: responseSort === 'asc' ? '#14866d' : '#bfbfbf',
-                                  marginBottom: '-3px',
-                                }}
-                              />
-                              <CaretDownOutlined
-                                style={{
-                                  color: responseSort === 'desc' ? '#14866d' : '#bfbfbf',
-                                }}
-                              />
-                            </span>
-                          </div>
-                        </th>
-                        <th className="flp-col-score">Điểm sàn</th>
-                        <th className="flp-col-status">Trạng thái</th>
+                        <SortableTableHeader className="flp-col-name" sortKey="title" sort={sort} onSort={toggleSort}>Tên quy trình</SortableTableHeader>
+                        <SortableTableHeader className="flp-col-version" sortKey="versionNumber" sort={sort} onSort={toggleSort}>Phiên bản</SortableTableHeader>
+                        <SortableTableHeader className="flp-col-created" sortKey="createdAt" sort={sort} onSort={toggleSort}>Ngày tạo</SortableTableHeader>
+                        <SortableTableHeader className="flp-col-assignees" sortKey="activeAssignmentCount" sort={sort} onSort={toggleSort}>Người được giao</SortableTableHeader>
+                        <SortableTableHeader className="flp-col-responses" sortKey="responseCount" sort={sort} onSort={toggleSort}>Lượt đánh giá</SortableTableHeader>
+                        <SortableTableHeader className="flp-col-score" sortKey="passingScore" sort={sort} onSort={toggleSort}>Điểm sàn</SortableTableHeader>
+                        <SortableTableHeader className="flp-col-status" sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                         <th className="flp-col-actions flp-table__actions-heading">Hành động</th>
                       </tr>
                     </thead>

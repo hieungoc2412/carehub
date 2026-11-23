@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { DeleteOutlined, EyeOutlined, FileTextOutlined, FolderOpenOutlined, PlusCircleOutlined, ReloadOutlined, SearchOutlined, StopOutlined, FilterOutlined, UserAddOutlined } from '@ant-design/icons'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import ExamAssignmentAddTargetsModal from '../components/ExamAssignmentAddTargetsModal.jsx'
 import { examAssignmentApi } from '../api/examAssignmentApi.js'
@@ -20,6 +22,7 @@ function ExamAssignmentListPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [pendingArchive, setPendingArchive] = useState(null)
   const [pendingAddTargets, setPendingAddTargets] = useState(null)
+  const { sort, toggleSort } = useTableSort()
 
   const loadAssignments = useCallback(async () => {
     setIsLoading(true)
@@ -49,6 +52,13 @@ function ExamAssignmentListPage() {
       return matchesKeyword && matchesStatus
     })
   }, [assignments, keyword, status])
+  const displayedAssignments = useMemo(() => sortTableRows(filteredAssignments, sort, {
+    name: assignment => assignment.name,
+    examPaperName: assignment => assignment.examPaperName,
+    targetCount: { getValue: assignment => assignment.targetCount, type: 'number' },
+    dueAt: { getValue: assignment => assignment.dueAt, type: 'date' },
+    status: assignment => assignment.status,
+  }), [filteredAssignments, sort])
 
   async function openAssignment(assignment) {
     try {
@@ -149,21 +159,21 @@ function ExamAssignmentListPage() {
                 <table className="exp-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th>Tên đợt giao đề</th>
-                      <th>Bộ đề</th>
-                      <th>Số NV</th>
+                      <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên đợt giao đề</SortableTableHeader>
+                      <SortableTableHeader sortKey="examPaperName" sort={sort} onSort={toggleSort}>Bộ đề</SortableTableHeader>
+                      <SortableTableHeader sortKey="targetCount" sort={sort} onSort={toggleSort}>Số NV</SortableTableHeader>
                       <th>Đã nộp / Tổng NV</th>
-                      <th>Hạn nộp</th>
-                      <th>Trạng thái</th>
+                      <SortableTableHeader sortKey="dueAt" sort={sort} onSort={toggleSort}>Hạn nộp</SortableTableHeader>
+                      <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                       <th style={{ width: 260 }}>Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr><td colSpan="7" className="exp-empty">Đang tải các đợt giao đề...</td></tr>
-                    ) : filteredAssignments.length === 0 ? (
+                    ) : displayedAssignments.length === 0 ? (
                       <tr><td colSpan="7" className="exp-empty">Chưa có đợt giao đề nào.</td></tr>
-                    ) : filteredAssignments.map((assignment) => (
+                    ) : displayedAssignments.map((assignment) => (
                       <tr key={assignment.id}>
                         <td><strong>{assignment.name}</strong></td>
                         <td>{assignment.examPaperCode} - {assignment.examPaperName}</td>

@@ -22,6 +22,7 @@
 .evidence-image-viewer button:focus-visible { outline: 3px solid #5eead4; outline-offset: 2px; }
 .evidence-image-viewer__toolbar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 8px 12px; }
 .evidence-image-viewer__toolbar output { min-width: 54px; text-align: center; font-variant-numeric: tabular-nums; }
+.evidence-image-viewer__toolbar-separator { width: 1px; height: 28px; margin: 0 2px; background: #475569; }
 .evidence-image-viewer__stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; user-select: none; overscroll-behavior: contain; }
 .evidence-image-viewer__stage--zoomed { cursor: grab; }
 .evidence-image-viewer__stage--zoomed:active { cursor: grabbing; }
@@ -36,5 +37,8 @@
 @media (max-width: 560px) {
   .evidence-image-viewer { width: calc(100vw - 16px); height: calc(100dvh - 16px); border-radius: 8px; }
   .evidence-image-viewer__header { padding: 8px; }
+  .evidence-image-viewer__toolbar { gap: 6px; padding: 6px 8px; }
+  .evidence-image-viewer__toolbar button { min-width: 40px; min-height: 40px; padding: 7px 10px; }
+  .evidence-image-viewer__toolbar-separator { height: 24px; }
   .evidence-image-viewer__hint { font-size: 11px; padding: 8px; }
 }

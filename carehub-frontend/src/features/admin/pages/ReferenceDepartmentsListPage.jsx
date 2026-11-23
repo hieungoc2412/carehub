@@ -6,7 +6,16 @@ import { adminApi } from '../api/adminApi'
 import { SearchOutlined, LeftOutlined, RightOutlined, PlusOutlined, EditOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/ReferenceDepartmentsListPage.css'
+
+const DEPARTMENT_SORT_COLUMNS = {
+  id: { getValue: department => department.id, type: 'number' },
+  departmentCode: department => department.departmentCode,
+  name: department => department.name,
+  employeeCount: { getValue: department => department.employeeCount, type: 'number' },
+}
 
 function ReferenceDepartmentsListPage() {
   const { showToast } = useToast()
@@ -22,6 +31,7 @@ function ReferenceDepartmentsListPage() {
   // Filters State
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(1))
 
   // Modal & Form State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -145,12 +155,16 @@ function ReferenceDepartmentsListPage() {
 
   // Pagination
   const PAGE_SIZE = 10
-  const totalElements = filteredDepartments.length
+  const sortedDepartments = useMemo(
+    () => sortTableRows(filteredDepartments, sort, DEPARTMENT_SORT_COLUMNS),
+    [filteredDepartments, sort],
+  )
+  const totalElements = sortedDepartments.length
   const totalPages = Math.ceil(totalElements / PAGE_SIZE)
   const paginatedDepartments = useMemo(() => {
     const startIndex = (page - 1) * PAGE_SIZE
-    return filteredDepartments.slice(startIndex, startIndex + PAGE_SIZE)
-  }, [filteredDepartments, page])
+    return sortedDepartments.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [page, sortedDepartments])
 
   const breadcrumbs = [
     { label: 'Danh mục phòng ban' }
@@ -215,10 +229,10 @@ function ReferenceDepartmentsListPage() {
                 <table className="rdl-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th style={{ width: '10%' }}>ID</th>
-                      <th style={{ width: '18%' }}>Mã Code</th>
-                      <th style={{ width: '38%' }}>Tên phòng ban</th>
-                      <th style={{ width: '14%' }}>Nhân viên</th>
+                      <SortableTableHeader sortKey="id" sort={sort} onSort={toggleSort} style={{ width: '10%' }}>ID</SortableTableHeader>
+                      <SortableTableHeader sortKey="departmentCode" sort={sort} onSort={toggleSort} style={{ width: '18%' }}>Mã Code</SortableTableHeader>
+                      <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort} style={{ width: '38%' }}>Tên phòng ban</SortableTableHeader>
+                      <SortableTableHeader sortKey="employeeCount" sort={sort} onSort={toggleSort} style={{ width: '14%' }}>Nhân viên</SortableTableHeader>
                       <th style={{ width: '20%' }}>Hành động</th>
                     </tr>
                   </thead>

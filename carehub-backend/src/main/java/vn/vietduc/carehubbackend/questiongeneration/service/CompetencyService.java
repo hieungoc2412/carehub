@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.vietduc.carehubbackend.form.entity.Form;
+import vn.vietduc.carehubbackend.exception.ValidationException;
 import vn.vietduc.carehubbackend.form.repository.FormRepository;
 import vn.vietduc.carehubbackend.form.submission.entity.FormSubmission;
 import vn.vietduc.carehubbackend.form.submission.repository.FormSubmissionRepository;
@@ -45,6 +46,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -93,7 +95,9 @@ public class CompetencyService {
                 normalizeKeyword(keyword),
                 fromInstant,
                 toInstant,
-                resultFilter == null ? normalizedPageable : Pageable.unpaged()
+                resultFilter == null && normalizedPageable.getSort().isUnsorted()
+                        ? normalizedPageable
+                        : Pageable.unpaged()
         );
         List<CompetencyTechniqueOptionResponse> forms =
                 formSubmissionRepository.findCompetencyTechniqueOptions(
@@ -126,12 +130,24 @@ public class CompetencyService {
             ));
         }
 
-        items.sort(Comparator.comparing(CompetencyByTechniqueItemResponse::employeeName));
-        Page<CompetencyByTechniqueItemResponse> resultPage = resultFilter == null
-                ? new PageImpl<>(items, normalizedPageable, aggregatePage.getTotalElements())
-                : page(items.stream()
+        List<CompetencyByTechniqueItemResponse> filteredItems = resultFilter == null
+                ? items
+                : items.stream()
                         .filter(item -> matchesResult(item.evaluationCount() > 0, item.isPassed(), resultFilter))
-                        .toList(), normalizedPageable);
+                        .toList();
+        if (normalizedPageable.getSort().isSorted()) {
+            filteredItems = filteredItems.stream()
+                    .sorted(techniqueComparator(normalizedPageable.getSort()))
+                    .toList();
+        } else {
+            filteredItems = filteredItems.stream()
+                    .sorted(Comparator.comparing(CompetencyByTechniqueItemResponse::employeeName))
+                    .toList();
+        }
+        Page<CompetencyByTechniqueItemResponse> resultPage =
+                aggregatePage.getPageable().isPaged() && resultFilter == null
+                        ? new PageImpl<>(filteredItems, normalizedPageable, aggregatePage.getTotalElements())
+                        : page(filteredItems, normalizedPageable);
 
         String formName = selectedForm != null ? selectedForm.getTitle() : null;
 
@@ -250,7 +266,9 @@ public class CompetencyService {
         Page<User> userPage = userRepository.findCompetencySummaryCandidates(
                 departmentId,
                 normalizeKeyword(keyword),
-                resultFilter == null ? normalizedPageable : Pageable.unpaged()
+                resultFilter == null && normalizedPageable.getSort().isUnsorted()
+                        ? normalizedPageable
+                        : Pageable.unpaged()
         );
         List<User> users = userPage.getContent();
         Map<Long, List<ExamAttempt>> attemptsByUser = users.isEmpty()
@@ -345,12 +363,23 @@ public class CompetencyService {
             ));
         }
 
-        items.sort(Comparator.comparing(CompetencySummaryItemResponse::employeeName));
-        Page<CompetencySummaryItemResponse> resultPage = resultFilter == null
-                ? new PageImpl<>(items, normalizedPageable, userPage.getTotalElements())
-                : page(items.stream()
+        List<CompetencySummaryItemResponse> filteredItems = resultFilter == null
+                ? items
+                : items.stream()
                         .filter(item -> matchesResult(item.overallScore() != null, item.isPassed(), resultFilter))
-                        .toList(), normalizedPageable);
+                        .toList();
+        if (normalizedPageable.getSort().isSorted()) {
+            filteredItems = filteredItems.stream()
+                    .sorted(summaryComparator(normalizedPageable.getSort()))
+                    .toList();
+        } else {
+            filteredItems = filteredItems.stream()
+                    .sorted(Comparator.comparing(CompetencySummaryItemResponse::employeeName))
+                    .toList();
+        }
+        Page<CompetencySummaryItemResponse> resultPage = userPage.getPageable().isPaged() && resultFilter == null
+                ? new PageImpl<>(filteredItems, normalizedPageable, userPage.getTotalElements())
+                : page(filteredItems, normalizedPageable);
 
         return new CompetencySummaryResponse(
                 departmentId, scopeName(department),
@@ -418,7 +447,91 @@ public class CompetencyService {
         int page = pageable != null ? Math.max(0, pageable.getPageNumber()) : 0;
         int requestedSize = pageable != null ? pageable.getPageSize() : 10;
         int size = Math.min(Math.max(requestedSize, 1), 100);
-        return PageRequest.of(page, size);
+        org.springframework.data.domain.Sort sort = pageable == null
+                ? org.springframework.data.domain.Sort.unsorted()
+                : pageable.getSort();
+        Set<String> allowed = Set.of(
+                "employeeCode", "departmentName", "examScore", "skillAverage", "overallScore",
+                "evaluationCount", "averageScore", "passRate", "isPassed"
+        );
+        sort.forEach(order -> {
+            if (!allowed.contains(order.getProperty())) {
+                throw ValidationException.field(
+                        "sort",
+                        "Trường sắp xếp không được hỗ trợ: " + order.getProperty()
+                );
+            }
+        });
+        return PageRequest.of(page, size, sort);
+    }
+
+    private Comparator<CompetencyByTechniqueItemResponse> techniqueComparator(
+            org.springframework.data.domain.Sort sort
+    ) {
+        org.springframework.data.domain.Sort.Order order = sort.iterator().next();
+        return (left, right) -> compareNullable(
+                switch (order.getProperty()) {
+                    case "employeeCode" -> left.employeeCode();
+                    case "departmentName" -> left.departmentName();
+                    case "evaluationCount" -> left.evaluationCount();
+                    case "averageScore" -> left.averageScore();
+                    case "passRate" -> left.passRate();
+                    case "isPassed" -> left.isPassed();
+                    default -> null;
+                },
+                switch (order.getProperty()) {
+                    case "employeeCode" -> right.employeeCode();
+                    case "departmentName" -> right.departmentName();
+                    case "evaluationCount" -> right.evaluationCount();
+                    case "averageScore" -> right.averageScore();
+                    case "passRate" -> right.passRate();
+                    case "isPassed" -> right.isPassed();
+                    default -> null;
+                },
+                order.isDescending(),
+                left.employeeId(),
+                right.employeeId()
+        );
+    }
+
+    private Comparator<CompetencySummaryItemResponse> summaryComparator(
+            org.springframework.data.domain.Sort sort
+    ) {
+        org.springframework.data.domain.Sort.Order order = sort.iterator().next();
+        return (left, right) -> compareNullable(
+                switch (order.getProperty()) {
+                    case "employeeCode" -> left.employeeCode();
+                    case "departmentName" -> left.departmentName();
+                    case "examScore" -> left.examScore() != null ? left.examScore() : left.knowledgeAverage();
+                    case "skillAverage" -> left.skillAverage();
+                    case "overallScore" -> left.overallScore();
+                    case "isPassed" -> left.isPassed();
+                    default -> null;
+                },
+                switch (order.getProperty()) {
+                    case "employeeCode" -> right.employeeCode();
+                    case "departmentName" -> right.departmentName();
+                    case "examScore" -> right.examScore() != null ? right.examScore() : right.knowledgeAverage();
+                    case "skillAverage" -> right.skillAverage();
+                    case "overallScore" -> right.overallScore();
+                    case "isPassed" -> right.isPassed();
+                    default -> null;
+                },
+                order.isDescending(),
+                left.employeeId(),
+                right.employeeId()
+        );
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private int compareNullable(Comparable left, Comparable right, boolean descending, Long leftId, Long rightId) {
+        if (left == null || right == null) {
+            if (left == right) return leftId.compareTo(rightId);
+            return left == null ? 1 : -1;
+        }
+        int compared = left.compareTo(right);
+        if (compared == 0) return leftId.compareTo(rightId);
+        return descending ? -compared : compared;
     }
 
     private List<Long> userIds(List<User> users) {

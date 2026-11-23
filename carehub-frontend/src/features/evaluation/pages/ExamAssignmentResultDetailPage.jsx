@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeftOutlined, FileTextOutlined, LoadingOutlined, ReloadOutlined } from '@ant-design/icons'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { examAssignmentApi } from '../api/examAssignmentApi.js'
 import { apiData, apiErrorMessage, formatNumber } from '../utils/documentQuestionUi.js'
 import './ExamResultPages.css'
@@ -57,6 +59,7 @@ export default function ExamAssignmentResultDetailPage() {
   const [results, setResults] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const { sort: fieldSort, toggleSort: toggleFieldSort } = useTableSort()
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -102,6 +105,12 @@ export default function ExamAssignmentResultDetailPage() {
   }, 0)
   const totalQuestions = attempt?.totalQuestions || questions.length || breakdown?.questions?.length || 0
   const resultsPath = `/admin/evaluation/exam-management/assignments/${assignmentId}/results`
+  const fieldRows = useMemo(() => sortTableRows(breakdown?.fields || [], fieldSort, {
+    professionalFieldName: field => field.professionalFieldName,
+    score: { getValue: field => field.score, type: 'number' },
+    passingThreshold: { getValue: field => field.passingThreshold, type: 'number' },
+    passed: { getValue: field => field.passed, type: 'boolean' },
+  }, field => field.professionalFieldId), [breakdown, fieldSort])
 
   return (
     <AppShell
@@ -179,9 +188,9 @@ export default function ExamAssignmentResultDetailPage() {
                   <h3>Theo lĩnh vực</h3>
                   <div className="ear-table-wrap">
                     <table className="ear-table ear-table--compact">
-                      <thead><tr><th>Lĩnh vực</th><th>Đúng / tổng</th><th>Điểm</th><th>Ngưỡng</th><th>Kết quả</th></tr></thead>
+                      <thead><tr><SortableTableHeader label="Lĩnh vực" field="professionalFieldName" sort={fieldSort} onSort={toggleFieldSort} /><th>Đúng / tổng</th><SortableTableHeader label="Điểm" field="score" sort={fieldSort} onSort={toggleFieldSort} /><SortableTableHeader label="Ngưỡng" field="passingThreshold" sort={fieldSort} onSort={toggleFieldSort} /><SortableTableHeader label="Kết quả" field="passed" sort={fieldSort} onSort={toggleFieldSort} /></tr></thead>
                       <tbody>
-                        {(breakdown?.fields || []).length === 0 ? <EmptyTableRow colSpan={5}>Chưa có dữ liệu theo lĩnh vực.</EmptyTableRow> : breakdown.fields.map((field) => (
+                        {fieldRows.length === 0 ? <EmptyTableRow colSpan={5}>Chưa có dữ liệu theo lĩnh vực.</EmptyTableRow> : fieldRows.map((field) => (
                           <tr key={field.professionalFieldId}>
                             <td><strong>{field.professionalFieldName || '—'}</strong><small>{field.professionalFieldCode || ''}</small></td>
                             <td>{field.correctCount}/{field.totalQuestions}</td>

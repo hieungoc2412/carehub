@@ -5,6 +5,8 @@ import { getApiErrorMessage } from '../../../shared/api/apiError.js'
 import SearchableSelect from '../../../shared/components/SearchableSelect.jsx'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/training.css'
 
 function TrainingLegacyImportPage() {
@@ -18,9 +20,17 @@ function TrainingLegacyImportPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const { sort: batchSort, toggleSort: toggleBatchSort } = useTableSort()
 
   const rows = useMemo(() => batch?.rows ?? [], [batch])
   const warningRows = useMemo(() => rows.filter((row) => row.validationStatus === 'WARNING'), [rows])
+  const sortedBatches = useMemo(() => sortTableRows(batches, batchSort, {
+    id: { getValue: item => item.id, type: 'number' },
+    originalFilename: item => item.originalFilename,
+    status: item => item.status,
+    totalRows: { getValue: item => item.totalRows, type: 'number' },
+    importedAt: { getValue: item => item.importedAt, type: 'date' },
+  }), [batchSort, batches])
 
   useEffect(() => {
     let mounted = true
@@ -304,15 +314,15 @@ function TrainingLegacyImportPage() {
               <table className="training-table training-table--compact">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>File</th>
-                    <th>Status</th>
-                    <th>Rows</th>
-                    <th>Imported at</th>
+                    <SortableTableHeader label="ID" field="id" sort={batchSort} onSort={toggleBatchSort} />
+                    <SortableTableHeader label="File" field="originalFilename" sort={batchSort} onSort={toggleBatchSort} />
+                    <SortableTableHeader label="Status" field="status" sort={batchSort} onSort={toggleBatchSort} />
+                    <SortableTableHeader label="Rows" field="totalRows" sort={batchSort} onSort={toggleBatchSort} />
+                    <SortableTableHeader label="Imported at" field="importedAt" sort={batchSort} onSort={toggleBatchSort} />
                   </tr>
                 </thead>
                 <tbody>
-                  {batches.map((item) => (
+                  {sortedBatches.map((item) => (
                     <tr key={item.id}>
                       <td>{item.id}</td>
                       <td>{item.originalFilename}</td>

@@ -6,7 +6,9 @@ import AppShell from '../../../shared/components/AppShell.jsx'
 import KeyboardDatePicker from '../../../shared/components/KeyboardDatePicker.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FilterActionButtons from '../../../shared/components/FilterActionButtons.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
 import { currentYearDateRange, validateHistoricalDateRange } from '../../../shared/utils/dateRange.js'
+import { nextTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/training.css'
 
 const STATUS_OPTIONS = ['DRAFT', 'SUBMITTED', 'CANCELLED']
@@ -30,7 +32,12 @@ function TrainingRecordListPage() {
     hasEvidence: searchParams.get('hasEvidence') ?? '',
     page: Number(searchParams.get('page') ?? 0),
     size: Number(searchParams.get('size') ?? 10),
+    sortField: searchParams.get('sortField') ?? '',
+    sortDirection: searchParams.get('sortDirection') ?? '',
   }), [searchParams])
+  const sort = filters.sortField && ['asc', 'desc'].includes(filters.sortDirection)
+    ? { key: filters.sortField, direction: filters.sortDirection }
+    : null
   const [filterDraft, setFilterDraft] = useState(filters)
   const [filterError, setFilterError] = useState('')
 
@@ -87,6 +94,20 @@ function TrainingRecordListPage() {
     setSearchParams(next)
   }
 
+  const handleSort = (field) => {
+    const nextSort = nextTableSort(sort, field)
+    const next = new URLSearchParams(searchParams)
+    next.set('page', '0')
+    if (nextSort) {
+      next.set('sortField', nextSort.key)
+      next.set('sortDirection', nextSort.direction)
+    } else {
+      next.delete('sortField')
+      next.delete('sortDirection')
+    }
+    setSearchParams(next)
+  }
+
   const handleApplyFilters = () => {
     const validationError = validateHistoricalDateRange(filterDraft.dateFrom, filterDraft.dateTo)
     if (validationError) {
@@ -100,6 +121,10 @@ function TrainingRecordListPage() {
       if (filterDraft[key]) next.set(key, String(filterDraft[key]))
     })
     next.set('size', String(filters.size))
+    if (sort) {
+      next.set('sortField', sort.key)
+      next.set('sortDirection', sort.direction)
+    }
     next.set('page', '0')
     setSearchParams(next)
   }
@@ -194,13 +219,13 @@ function TrainingRecordListPage() {
                 <thead>
                   <tr>
                     <th>Employee</th>
-                    <th>Program</th>
-                    <th>Activity</th>
-                    <th>Dates</th>
-                    <th>Hours</th>
+                    <SortableTableHeader label="Program" field="title" sort={sort} onSort={handleSort} />
+                    <SortableTableHeader label="Activity" field="activityTypeName" sort={sort} onSort={handleSort} />
+                    <SortableTableHeader label="Dates" field="startDate" sort={sort} onSort={handleSort} />
+                    <SortableTableHeader label="Hours" field="declaredHours" sort={sort} onSort={handleSort} />
                     <th>Evidence</th>
-                    <th>Status</th>
-                    <th>Updated</th>
+                    <SortableTableHeader label="Status" field="workflowStatus" sort={sort} onSort={handleSort} />
+                    <SortableTableHeader label="Updated" field="updatedAt" sort={sort} onSort={handleSort} />
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -288,7 +313,9 @@ function toApiParams(filters) {
   const params = {
     page: filters.page,
     size: filters.size,
-    sort: 'updatedAt,desc',
+    sort: filters.sortField && ['asc', 'desc'].includes(filters.sortDirection)
+      ? `${filters.sortField},${filters.sortDirection}`
+      : 'updatedAt,desc',
   }
   for (const key of ['keyword', 'dateFrom', 'dateTo', 'activityTypeId', 'workflowStatus', 'hasEvidence']) {
     if (filters[key]) {

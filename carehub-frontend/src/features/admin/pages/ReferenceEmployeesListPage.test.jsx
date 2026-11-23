@@ -70,7 +70,7 @@ describe('ReferenceEmployeesListPage - danh sách', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Đang tải danh sách nhân viên từ backend...')
 
     await screen.findByText('Nhân viên 1')
-    expect(api.getUsers).toHaveBeenCalledWith({ size: 10000 })
+    expect(api.getUsers).toHaveBeenCalledWith({ page: 0, size: 100 })
     expect(screen.getByText('NV001')).toBeInTheDocument()
     expect(screen.getAllByText('Khoa Nội').length).toBeGreaterThan(0)
     expect(within(screen.getByRole('table')).getAllByText('Nam')).toHaveLength(2)

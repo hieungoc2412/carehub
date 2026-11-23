@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import AppShell from '../../../shared/components/AppShell.jsx'
 import { adminApi } from '../api/adminApi'
@@ -19,6 +19,8 @@ import {
 } from '@ant-design/icons'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/FormMetadataFormPage.css'
 
 const DEFAULT_FORM_SUBJECT_TYPE = 'USER'
@@ -69,6 +71,17 @@ function FormMetadataFormPage() {
   const [loadingScoring, setLoadingScoring] = useState(false)
   const [scoreConfigurable, setScoreConfigurable] = useState(false)
   const [scoringReady, setScoringReady] = useState(false)
+  const { sort: versionSort, toggleSort: toggleVersionSort } = useTableSort()
+  const displayedVersions = useMemo(() => sortTableRows(
+    [...versions].sort((left, right) => Number(right.versionNumber) - Number(left.versionNumber)),
+    versionSort,
+    {
+      versionNumber: { getValue: version => version.versionNumber, type: 'number' },
+      status: version => version.status,
+      createdAt: { getValue: version => version.createdAt, type: 'date' },
+      publishedAt: { getValue: version => version.publishedAt, type: 'date' },
+    },
+  ), [versionSort, versions])
 
   // Form states
   const [code, setCode] = useState('')
@@ -457,10 +470,10 @@ function FormMetadataFormPage() {
                         <table className="fmp-v-table">
                           <thead>
                             <tr>
-                              <th style={{ width: '10%' }}>Phiên bản</th>
-                              <th style={{ width: '15%' }}>Trạng thái</th>
-                              <th style={{ width: '20%' }}>Ngày khởi tạo</th>
-                              <th style={{ width: '21%' }}>Công bố lúc</th>
+                              <SortableTableHeader style={{ width: '10%' }} label="Phiên bản" field="versionNumber" sort={versionSort} onSort={toggleVersionSort} />
+                              <SortableTableHeader style={{ width: '15%' }} label="Trạng thái" field="status" sort={versionSort} onSort={toggleVersionSort} />
+                              <SortableTableHeader style={{ width: '20%' }} label="Ngày khởi tạo" field="createdAt" sort={versionSort} onSort={toggleVersionSort} />
+                              <SortableTableHeader style={{ width: '21%' }} label="Công bố lúc" field="publishedAt" sort={versionSort} onSort={toggleVersionSort} />
                               <th style={{ width: '15%' }}>Người công bố</th>
                               <th style={{ width: '19%', textAlign: 'center' }}>Hành động</th>
                             </tr>
@@ -479,8 +492,7 @@ function FormMetadataFormPage() {
                                 </td>
                               </tr>
                             ) : (
-                              [...versions]
-                                .sort((a, b) => b.versionNumber - a.versionNumber)
+                              displayedVersions
                                 .map((v) => (
                                   <tr key={v.id}>
                                     <td>

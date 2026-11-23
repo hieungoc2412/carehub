@@ -18,9 +18,11 @@ import KeyboardDatePicker from '../../../shared/components/KeyboardDatePicker.js
 import DateTimePicker24h from '../../../shared/components/DateTimePicker24h.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import SearchableSelect from '../../../shared/components/SearchableSelect.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
 import { adminApi } from '../api/adminApi'
 import { getChecklistDisplayCode } from '../utils/formCode.js'
 import { validateHistoricalDateRange } from '../../../shared/utils/dateRange.js'
+import { apiSort, nextTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/AdminQualityHistoryPage.css'
 
 const RESULT_OPTIONS = [
@@ -192,6 +194,11 @@ function AdminQualityHistoryVersionPage({ role = 'admin' }) {
   const result = searchParams.get('result') || ''
   const dateFrom = searchParams.get('dateFrom') || defaultDateRange.dateFrom
   const dateTo = searchParams.get('dateTo') || defaultDateRange.dateTo
+  const sortField = searchParams.get('sortField') || ''
+  const sortDirection = searchParams.get('sortDirection') || ''
+  const sort = useMemo(() => sortField && ['asc', 'desc'].includes(sortDirection)
+    ? { key: sortField, direction: sortDirection }
+    : null, [sortDirection, sortField])
 
   const [keywordInput, setKeywordInput] = useState(keyword)
   const [draftVersionId, setDraftVersionId] = useState(versionId)
@@ -375,7 +382,13 @@ function AdminQualityHistoryVersionPage({ role = 'admin' }) {
     // from a null optional parameter in the shared history predicates.
     dateFrom,
     dateTo,
-  }), [dateFrom, dateTo, departmentId, isManager, keyword, result, submittedByUserId])
+    sort: apiSort(sort),
+  }), [dateFrom, dateTo, departmentId, isManager, keyword, result, sort, submittedByUserId])
+
+  const handleSort = (field) => {
+    const next = nextTableSort(sort, field)
+    updateQuery({ sortField: next?.key || '', sortDirection: next?.direction || '', page: 0 }, false)
+  }
 
   useEffect(() => {
     let alive = true
@@ -642,6 +655,10 @@ function AdminQualityHistoryVersionPage({ role = 'admin' }) {
     if (draftResult) nextParams.set('result', draftResult)
     if (searchParams.get('source')) nextParams.set('source', searchParams.get('source'))
     if (dashboardKeyword) nextParams.set('dashboardKeyword', dashboardKeyword)
+    if (sort) {
+      nextParams.set('sortField', sort.key)
+      nextParams.set('sortDirection', sort.direction)
+    }
     setResultsLoading(true)
     setIsFilterOpen(false)
     navigate(`${versionBasePath}/forms/${formId}/versions/${draftVersionId || versionId}?${nextParams.toString()}`, { replace: true })
@@ -831,11 +848,11 @@ function AdminQualityHistoryVersionPage({ role = 'admin' }) {
                         <thead>
                           <tr>
                             <th className="aqh-result-col-employee">Nhân viên</th>
-                            <th className="aqh-result-col-department">Khoa/phòng</th>
+                            <SortableTableHeader className="aqh-result-col-department" label="Khoa/phòng" field="departmentName" sort={sort} onSort={handleSort} />
                             <th className="aqh-result-col-grader">Người chấm</th>
-                            <th className="aqh-result-col-submitted">Ngày nộp</th>
-                            <th className="aqh-result-col-score">Điểm</th>
-                            <th className="aqh-result-col-result">Kết quả</th>
+                            <SortableTableHeader className="aqh-result-col-submitted" label="Ngày nộp" field="submittedAt" sort={sort} onSort={handleSort} />
+                            <SortableTableHeader className="aqh-result-col-score" label="Điểm" field="convertedScore" sort={sort} onSort={handleSort} />
+                            <SortableTableHeader className="aqh-result-col-result" label="Kết quả" field="result" sort={sort} onSort={handleSort} />
                             <th className="aqh-result-col-actions">Hành động</th>
                           </tr>
                         </thead>

@@ -198,7 +198,7 @@
 }
 
 .dashboard-header__notify-icon--ringing {
-  animation: dashboard-notification-ring 6s ease-in-out infinite;
+  animation: dashboard-notification-ring 3s ease-in-out infinite;
 }
 
 .dashboard-header__notify-badge {
@@ -224,11 +224,11 @@
 }
 
 @keyframes dashboard-notification-ring {
-  0%, 13.333%, 100% { transform: rotate(0deg); }
-  2%, 6% { transform: rotate(14deg); }
-  4%, 8% { transform: rotate(-14deg); }
-  10% { transform: rotate(8deg); }
-  12% { transform: rotate(-8deg); }
+  0%, 26.667%, 100% { transform: rotate(0deg); }
+  4%, 12% { transform: rotate(14deg); }
+  8%, 16% { transform: rotate(-14deg); }
+  20% { transform: rotate(8deg); }
+  24% { transform: rotate(-8deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

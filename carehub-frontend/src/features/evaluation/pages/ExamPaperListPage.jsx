@@ -5,6 +5,8 @@ import { DeleteOutlined, DownloadOutlined, PlusCircleOutlined, ReloadOutlined, S
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import Modal from '../../../shared/components/Modal.jsx'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
@@ -34,6 +36,7 @@ function ExamPaperListPage({
   const [showAnswers, setShowAnswers] = useState(false)
   const [actionId, setActionId] = useState(null)
   const [pendingArchive, setPendingArchive] = useState(null)
+  const { sort, toggleSort } = useTableSort()
 
   const loadPapers = useCallback(async () => {
     setIsLoading(true)
@@ -74,6 +77,14 @@ function ExamPaperListPage({
       return matchesKeyword && matchesStatus
     })
   }, [appliedFilters, papers])
+  const displayedPapers = useMemo(() => sortTableRows(filteredPapers, sort, {
+    code: paper => paper.code,
+    name: paper => paper.name,
+    examConfigName: paper => paper.examConfigName,
+    totalQuestions: { getValue: paper => paper.totalQuestions, type: 'number' },
+    status: paper => paper.status,
+    createdAt: { getValue: paper => paper.createdAt, type: 'date' },
+  }), [filteredPapers, sort])
 
   const expandedPaper = expandedId ? papers.find((p) => p.id === expandedId) : null
 
@@ -203,21 +214,21 @@ function ExamPaperListPage({
                 <table className="exp-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th>Mã đề</th>
-                      <th>Tên đề</th>
-                      <th>Cấu hình</th>
-                      <th>Số câu</th>
-                      <th>Trạng thái</th>
-                      <th>Ngày tạo</th>
+                      <SortableTableHeader sortKey="code" sort={sort} onSort={toggleSort}>Mã đề</SortableTableHeader>
+                      <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên đề</SortableTableHeader>
+                      <SortableTableHeader sortKey="examConfigName" sort={sort} onSort={toggleSort}>Cấu hình</SortableTableHeader>
+                      <SortableTableHeader sortKey="totalQuestions" sort={sort} onSort={toggleSort}>Số câu</SortableTableHeader>
+                      <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
+                      <SortableTableHeader sortKey="createdAt" sort={sort} onSort={toggleSort}>Ngày tạo</SortableTableHeader>
                       <th style={{ width: 180 }}>Hành động</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       <tr><td colSpan="7" className="exp-empty">Đang tải bộ đề kiểm tra...</td></tr>
-                    ) : filteredPapers.length === 0 ? (
+                    ) : displayedPapers.length === 0 ? (
                       <tr><td colSpan="7" className="exp-empty">Chưa có bộ đề kiểm tra.</td></tr>
-                    ) : filteredPapers.map((paper) => (
+                    ) : displayedPapers.map((paper) => (
                       <tr key={paper.id}>
                         <td><strong>{paper.code}</strong></td>
                         <td>{paper.name}</td>

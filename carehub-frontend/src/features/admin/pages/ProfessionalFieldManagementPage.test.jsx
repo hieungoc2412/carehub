@@ -67,6 +67,29 @@ describe('ProfessionalFieldManagementPage create form', () => {
     expect(within(row).getByRole('button', { name: 'Phê duyệt lĩnh vực Điều dưỡng nhi' })).toBeInTheDocument()
   })
 
+  it('orders pending proposals by creation date with the newest first', async () => {
+    adminApi.getProfessionalFields.mockResolvedValue({ data: { data: { content: [
+      {
+        id: 1, code: 'CUSTOM_1', name: 'Đề xuất cũ', active: false,
+        moderationStatus: 'PENDING', createdAt: '2026-10-20T08:00:00',
+      },
+      {
+        id: 2, code: 'CUSTOM_2', name: 'Đề xuất mới', active: false,
+        moderationStatus: 'PENDING', createdAt: '2026-11-23T10:27:00',
+      },
+    ] } } })
+
+    renderPage('/admin/training/professional-fields?tab=pending')
+
+    await screen.findByText('Đề xuất mới')
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(within(rows[0]).getByText('Đề xuất mới')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Đề xuất cũ')).toBeInTheDocument()
+    expect(adminApi.getProfessionalFields).toHaveBeenCalledWith(expect.objectContaining({
+      sort: 'createdAt,desc',
+    }))
+  })
+
   it.each([undefined, 'invalid-date'])('does not invent proposer or proposal date when metadata is missing (%s)', async (createdAt) => {
     adminApi.getProfessionalFields.mockResolvedValue({ data: { data: { content: [{
       id: 8, code: 'CUSTOM_8', name: 'Lĩnh vực cũ', active: false, moderationStatus: 'REJECTED',
@@ -100,7 +123,7 @@ describe('ProfessionalFieldManagementPage create form', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Tạo mới lĩnh vực/i }))
     fireEvent.change(screen.getByLabelText(/Mã lĩnh vực/i), { target: { value: '  CAP_CUU  ' } })
-    fireEvent.change(screen.getByLabelText(/Tên lĩnh vực/i), { target: { value: '  Chăm sóc cấp cứu  ' } })
+    fireEvent.change(screen.getByPlaceholderText('VD: Chăm sóc cấp cứu'), { target: { value: '  Chăm sóc cấp cứu  ' } })
     fireEvent.change(screen.getByLabelText('Mô tả'), { target: { value: '  Chăm sóc người bệnh cấp cứu  ' } })
     fireEvent.click(screen.getByRole('button', { name: /Tạo lĩnh vực/i }))
 

@@ -4,9 +4,11 @@ import AppShell from '../../../shared/components/AppShell.jsx'
 import KeyboardDatePicker from '../../../shared/components/KeyboardDatePicker.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
 import { adminApi } from '../api/adminApi'
 import { EyeOutlined, LeftOutlined, RightOutlined, LoadingOutlined } from '@ant-design/icons'
 import { currentYearDateRange, validateHistoricalDateRange } from '../../../shared/utils/dateRange.js'
+import { apiSort, sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/ImportLogsListPage.css'
 
 const DEFAULT_IMPORT_LOG_DATES = currentYearDateRange()
@@ -119,6 +121,7 @@ function ImportLogsListPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [filterError, setFilterError] = useState('')
   const [appliedFilters, setAppliedFilters] = useState({ file: 'all', status: 'all', ...DEFAULT_IMPORT_LOG_DATES })
+  const { sort, toggleSort } = useTableSort(null, () => setPage(1))
 
   // Details Modal State
   const [selectedLog, setSelectedLog] = useState(null)
@@ -194,6 +197,14 @@ function ImportLogsListPage() {
       filtered = filtered.filter(log => new Date(log.createdAt).getTime() <= toTime)
     }
 
+    filtered = sortTableRows(filtered, sort, {
+      createdAt: { getValue: log => log.createdAt, type: 'date' },
+      sourceFile: log => log.sourceFile,
+      totalRows: { getValue: log => log.totalRows, type: 'number' },
+      successfulRows: { getValue: log => Number(log.insertedRows) + Number(log.updatedRows), type: 'number' },
+      failedRows: { getValue: log => log.failedRows, type: 'number' },
+      status: log => log.status,
+    })
     setTotalElements(filtered.length)
     const computedPages = Math.ceil(filtered.length / 10)
     setTotalPages(computedPages || 1)
@@ -229,7 +240,8 @@ function ImportLogsListPage() {
       page: page - 1, // 0-indexed in backend
       size: 10,
       q: appliedFilters.file !== 'all' ? appliedFilters.file : undefined,
-      status: apiStatus
+      status: apiStatus,
+      sort: apiSort(sort),
     }
 
     adminApi.getImportLogs(params)
@@ -262,7 +274,7 @@ function ImportLogsListPage() {
         setUseMock(true)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, appliedFilters, useMock])
+  }, [page, appliedFilters, useMock, sort])
 
   // Re-apply filters for mock data when page or filters change
   useEffect(() => {
@@ -271,7 +283,7 @@ function ImportLogsListPage() {
       applyMockFilters()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, appliedFilters, useMock])
+  }, [page, appliedFilters, useMock, sort])
 
   // Open details modal
   const handleOpenDetailModal = (log) => {
@@ -505,12 +517,12 @@ function ImportLogsListPage() {
                 <table className="il-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th>Thời gian diễn ra</th>
-                      <th>Loại dữ liệu nhập</th>
-                      <th>Tổng</th>
-                      <th>Thành công</th>
-                      <th>Lỗi</th>
-                      <th>Trạng thái</th>
+                      <SortableTableHeader label="Thời gian diễn ra" field="createdAt" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Loại dữ liệu nhập" field="sourceFile" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Tổng" field="totalRows" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Thành công" field="successfulRows" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Lỗi" field="failedRows" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Trạng thái" field="status" sort={sort} onSort={toggleSort} />
                       <th>Hành động</th>
                     </tr>
                   </thead>

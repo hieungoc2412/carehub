@@ -8,6 +8,8 @@ import { SearchOutlined, EyeOutlined, LeftOutlined, RightOutlined } from '@ant-d
 import { adminApi } from '../api/adminApi.js'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FilterActionButtons from '../../../shared/components/FilterActionButtons.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { formatRoleLabels } from '../../../shared/utils/roleLabels.js'
 import '../styles/ReferenceEmployeesListPage.css'
 
@@ -27,6 +29,7 @@ function ReferenceEmployeesListPage() {
   const [genderFilter, setGenderFilter] = useState('all')
   const [cbTypeFilter, setCbTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(1))
 
   // Load real employee data from backend
   useEffect(() => {
@@ -35,9 +38,18 @@ function ReferenceEmployeesListPage() {
       setLoading(true)
       setError(null)
       try {
-        const response = await adminApi.getUsers({ size: 10000 })
+        const response = await adminApi.getUsers({ page: 0, size: 100 })
         if (active && response.data?.success) {
-          const content = response.data.data.content || []
+          const firstPage = response.data.data || {}
+          const remaining = Number(firstPage.totalPages) > 1
+            ? await Promise.all(Array.from({ length: Number(firstPage.totalPages) - 1 }, (_, index) => (
+                adminApi.getUsers({ page: index + 1, size: 100 })
+              )))
+            : []
+          const content = [
+            ...(firstPage.content || []),
+            ...remaining.flatMap(item => item.data?.data?.content || []),
+          ]
 
           // Map to match frontend format
           const mapped = content.map(emp => {
@@ -124,7 +136,16 @@ function ReferenceEmployeesListPage() {
 
   // Pagination
   const PAGE_SIZE = 10
-  const totalElements = filteredEmployees.length
+  const sortedEmployees = useMemo(() => sortTableRows(filteredEmployees, sort, {
+    employeeCode: employee => employee.employeeCode,
+    departmentName: employee => employee.departmentName,
+    cbType: employee => employee.cbType,
+    gender: employee => employee.gender,
+    degree: employee => employee.degree,
+    positionName: employee => employee.positionName,
+    titleName: employee => employee.titleName,
+  }), [filteredEmployees, sort])
+  const totalElements = sortedEmployees.length
   const totalPages = Math.ceil(totalElements / PAGE_SIZE)
   const getVisiblePages = () => {
     const pages = []
@@ -148,8 +169,8 @@ function ReferenceEmployeesListPage() {
   }
   const paginatedEmployees = useMemo(() => {
     const startIndex = (page - 1) * PAGE_SIZE
-    return filteredEmployees.slice(startIndex, startIndex + PAGE_SIZE)
-  }, [filteredEmployees, page])
+    return sortedEmployees.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [page, sortedEmployees])
 
   const breadcrumbs = [
     { label: 'Dữ liệu tham chiếu' },
@@ -295,14 +316,14 @@ function ReferenceEmployeesListPage() {
                 <table className="rel-table">
                   <thead>
                     <tr>
-                      <th>Mã CB</th>
+                      <SortableTableHeader sortKey="employeeCode" sort={sort} onSort={toggleSort}>Mã CB</SortableTableHeader>
                       <th>Họ và tên</th>
-                      <th>Đơn vị</th>
-                      <th>Loại CB</th>
-                      <th>Giới tính</th>
-                      <th>Trình độ</th>
-                      <th>Vị trí</th>
-                      <th>Chức danh</th>
+                      <SortableTableHeader sortKey="departmentName" sort={sort} onSort={toggleSort}>Đơn vị</SortableTableHeader>
+                      <SortableTableHeader sortKey="cbType" sort={sort} onSort={toggleSort}>Loại CB</SortableTableHeader>
+                      <SortableTableHeader sortKey="gender" sort={sort} onSort={toggleSort}>Giới tính</SortableTableHeader>
+                      <SortableTableHeader sortKey="degree" sort={sort} onSort={toggleSort}>Trình độ</SortableTableHeader>
+                      <SortableTableHeader sortKey="positionName" sort={sort} onSort={toggleSort}>Vị trí</SortableTableHeader>
+                      <SortableTableHeader sortKey="titleName" sort={sort} onSort={toggleSort}>Chức danh</SortableTableHeader>
                       <th>Hành động</th>
                     </tr>
                   </thead>
