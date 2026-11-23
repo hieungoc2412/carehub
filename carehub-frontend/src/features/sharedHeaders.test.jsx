@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const headerMocks = vi.hoisted(() => ({
@@ -81,6 +81,55 @@ const notificationSamples = [
   { id: 3, type: 'SUCCESS', message: 'Thành công', sender: 'Hệ thống', createdAt: '08:02', read: true },
   { id: 4, type: 'UNKNOWN', message: 'Thông tin', sender: 'Hệ thống', createdAt: '08:03', read: false },
 ]
+
+function NotificationLocation() {
+  const location = useLocation()
+  return <output data-testid="notification-location">{location.pathname}{location.search}</output>
+}
+
+describe('notification navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    headerMocks.profileError = null
+    headerMocks.pendingExamCount = 0
+    headerMocks.hasChecklistAssignment = false
+    headerMocks.markAsRead.mockReset()
+  })
+
+  it.each([
+    ['ADMIN', '/admin/training/professional-fields?tab=pending', AdminHeader],
+    ['USER', '/staff/checklists', Header],
+    ['USER', '/staff/exam/take', Header],
+    ['MANAGER', '/manager/quality/checklists', Header],
+  ])('%s opens the notification destination %s', (role, deepLink, Component) => {
+    headerMocks.roles = [role]
+    headerMocks.profileData = { fullName: 'Người dùng', roles: [role] }
+    headerMocks.notifications = [{ ...notificationSamples[0], message: 'Thông báo được giao', deepLink }]
+    headerMocks.unreadCount = 1
+    render(<MemoryRouter initialEntries={['/start']}><Component /><NotificationLocation /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^Mở thông báo,/ }))
+
+    fireEvent.click(screen.getByText('Thông báo được giao'))
+
+    expect(screen.getByTestId('notification-location')).toHaveTextContent(deepLink)
+    expect(headerMocks.markAsRead).toHaveBeenCalledWith(1)
+    expect(screen.queryByText('Thông báo được giao')).not.toBeInTheDocument()
+  })
+
+  it.each([false, true])('opens a notification with read=%s without waiting for a read request', (read) => {
+    headerMocks.roles = ['USER']
+    headerMocks.profileData = { fullName: 'Nhân viên', roles: ['USER'] }
+    headerMocks.notifications = [{ ...notificationSamples[0], message: 'Bài kiểm tra được giao', read, deepLink: '/staff/exam/take' }]
+    headerMocks.unreadCount = read ? 0 : 1
+    headerMocks.markAsRead.mockReturnValueOnce(new Promise(() => {}))
+    render(<MemoryRouter><Header /><NotificationLocation /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^Mở thông báo,/ }))
+
+    fireEvent.click(screen.getByText('Bài kiểm tra được giao'))
+
+    expect(screen.getByTestId('notification-location')).toHaveTextContent('/staff/exam/take')
+  })
+})
 
 describe('staff Header', () => {
   beforeEach(() => {

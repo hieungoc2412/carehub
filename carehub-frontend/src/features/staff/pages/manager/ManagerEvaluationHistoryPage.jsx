@@ -130,7 +130,6 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
   const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   const updateQuery = useCallback((changes, resetPage = true) => {
-    setResultsLoading(true)
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
       Object.entries(changes).forEach(([key, value]) => {
@@ -144,12 +143,22 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
 
   useEffect(() => {
     setKeywordInput(keyword)
+  }, [keyword])
+
+  useEffect(() => {
+    const nextKeyword = keywordInput.trim()
+    if (nextKeyword === keyword) return undefined
+    const timer = window.setTimeout(() => updateQuery({ keyword: nextKeyword }), 300)
+    return () => window.clearTimeout(timer)
+  }, [keyword, keywordInput, updateQuery])
+
+  useEffect(() => {
     setDraftFormId(formId)
     setDraftDepartmentId(departmentId)
     setDraftResult(result)
     setDraftDateFrom(dateFrom)
     setDraftDateTo(dateTo)
-  }, [dateFrom, dateTo, departmentId, formId, keyword, result])
+  }, [dateFrom, dateTo, departmentId, formId, result])
 
   useEffect(() => {
     if (!isFilterOpen) return undefined
@@ -235,6 +244,7 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
     }
     setFilterError('')
     updateQuery({
+      keyword: keywordInput.trim(),
       formId: draftFormId,
       departmentId: draftDepartmentId,
       result: draftResult,
@@ -245,12 +255,14 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
 
   function handleResetFilters() {
     setFilterError('')
+    setKeywordInput('')
     setDraftFormId('')
     setDraftDepartmentId('')
     setDraftResult('')
     setDraftDateFrom(defaultDateRange.dateFrom)
     setDraftDateTo(defaultDateRange.dateTo)
     updateQuery({
+      keyword: '',
       formId: '',
       departmentId: '',
       result: '',

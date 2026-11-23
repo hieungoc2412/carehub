@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CaretDownOutlined,
@@ -90,10 +90,20 @@ function ComplianceByTechniquePage() {
   const [filterError, setFilterError] = useState('')
   const [appliedFilters, setAppliedFilters] = useState({ departmentId: '', keyword: '', fromDate: yearStart, toDate: today })
   const [sortDirection, setSortDirection] = useState(null)
+  const loadRequestId = useRef(0)
   const effectiveDepartmentId = isAdmin ? appliedFilters.departmentId : departmentId
   const effectiveKeyword = appliedFilters.keyword
   const effectiveFromDate = appliedFilters.fromDate
   const effectiveToDate = appliedFilters.toDate
+
+  useEffect(() => {
+    const nextKeyword = keyword.trim()
+    if (nextKeyword === appliedFilters.keyword) return undefined
+    const timer = window.setTimeout(() => {
+      setAppliedFilters((current) => ({ ...current, keyword: nextKeyword }))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [appliedFilters.keyword, keyword])
 
   useEffect(() => {
     if (departments.length > 0 || (isAdmin && !isFilterOpen)) return undefined
@@ -124,10 +134,11 @@ function ComplianceByTechniquePage() {
   }, [departments.length, isAdmin, isFilterOpen, showToast])
 
   const loadData = useCallback(async () => {
-    if (!departmentId && !isAdmin) {
+    if (!effectiveDepartmentId && !isAdmin) {
       showToast('Vui lòng chọn khoa/phòng', 'warning')
       return
     }
+    const requestId = ++loadRequestId.current
     setLoading(true)
     try {
       const responseData = await loadAllTechniqueRows({
@@ -136,19 +147,22 @@ function ComplianceByTechniquePage() {
         fromDate: effectiveFromDate || undefined,
         toDate: effectiveToDate || undefined,
       })
-      setData(responseData)
+      if (requestId === loadRequestId.current) setData(responseData)
     } catch (error) {
-      showToast(apiErrorMessage(error), 'error')
+      if (requestId === loadRequestId.current) showToast(apiErrorMessage(error), 'error')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestId.current) setLoading(false)
     }
-  }, [departmentId, effectiveDepartmentId, effectiveFromDate, effectiveKeyword, effectiveToDate, isAdmin, showToast])
+  }, [effectiveDepartmentId, effectiveFromDate, effectiveKeyword, effectiveToDate, isAdmin, showToast])
 
   useEffect(() => {
-    if (!departmentId && !isAdmin) return undefined
+    if (!effectiveDepartmentId && !isAdmin) return undefined
     const timer = window.setTimeout(loadData, 0)
-    return () => window.clearTimeout(timer)
-  }, [departmentId, isAdmin, loadData])
+    return () => {
+      window.clearTimeout(timer)
+      loadRequestId.current += 1
+    }
+  }, [effectiveDepartmentId, isAdmin, loadData])
 
   // `data.items` chính là kết quả của bộ lọc đang áp dụng (backend lọc theo khoa, từ khóa và
   // khoảng ngày), nên file xuất ra luôn khớp đúng những gì đang hiển thị trên bảng.

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import NotificationsStaffScreen from './NotificationsStaffScreen.jsx'
 
 const showToast = vi.fn()
+const navigate = vi.fn()
 const publishNotificationStateChange = vi.fn()
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -13,6 +14,7 @@ const api = vi.hoisted(() => ({
 }))
 
 vi.mock('react-router-dom', () => ({
+  useNavigate: () => navigate,
   Link: ({ to, children, onClick, ...rest }) => <a href={to} onClick={onClick} {...rest}>{children}</a>,
 }))
 vi.mock('../api/notificationsApi.js', () => ({ notificationsApi: api }))
@@ -235,6 +237,41 @@ describe('NotificationsStaffScreen - xoá thông báo', () => {
 })
 
 describe('NotificationsStaffScreen - chi tiết thông báo', () => {
+  it('mở thông báo có link đã đọc mà không đánh dấu lại', async () => {
+    api.list.mockResolvedValue(listResponse([notification(1, { read: true, deepLink: '/staff/exam/take' })]))
+    await renderPage()
+
+    fireEvent.click(cardOf('Thông báo 1'))
+
+    expect(navigate).toHaveBeenCalledWith('/staff/exam/take')
+    expect(api.markAsRead).not.toHaveBeenCalled()
+    expect(api.get).not.toHaveBeenCalled()
+  })
+
+  it.each(['Đánh dấu đã đọc', 'Xóa thông báo'])('nút %s không chuyển trang theo link thông báo', async (title) => {
+    api.list.mockResolvedValue(listResponse([notification(1, { deepLink: '/staff/checklists' })]))
+    await renderPage()
+
+    fireEvent.click(within(cardOf('Thông báo 1')).getByTitle(title))
+
+    expect(navigate).not.toHaveBeenCalled()
+    expect(title === 'Đánh dấu đã đọc' ? api.markAsRead : api.delete).toHaveBeenCalledWith(1)
+  })
+
+  it.each(['/staff/checklists', '/staff/exam/take', '/admin/training/professional-fields?tab=pending'])(
+    'mở trực tiếp đích thông báo %s và đánh dấu đã đọc', async (deepLink) => {
+      api.list.mockResolvedValue(listResponse([notification(1, { deepLink })]))
+      await renderPage()
+
+      fireEvent.click(cardOf('Thông báo 1'))
+
+      expect(navigate).toHaveBeenCalledWith(deepLink)
+      expect(api.markAsRead).toHaveBeenCalledWith(1)
+      expect(api.get).not.toHaveBeenCalled()
+      expect(publishNotificationStateChange).toHaveBeenCalledWith({ readId: 1, decrementUnreadBy: 1 })
+    },
+  )
+
   it('mở chi tiết, tải bản đầy đủ và tự đánh dấu đã đọc', async () => {
     await renderPage()
     fireEvent.click(cardOf('Thông báo 1'))

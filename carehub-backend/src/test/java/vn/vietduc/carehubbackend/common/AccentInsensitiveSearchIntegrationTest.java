@@ -22,8 +22,11 @@ import vn.vietduc.carehubbackend.form.entity.Form;
 import vn.vietduc.carehubbackend.form.entity.enums.FormStatus;
 import vn.vietduc.carehubbackend.form.entity.enums.FormSubjectType;
 import vn.vietduc.carehubbackend.form.repository.FormRepository;
+import vn.vietduc.carehubbackend.form.submission.repository.FormSubmissionRepository;
 import vn.vietduc.carehubbackend.user.entity.User;
 import vn.vietduc.carehubbackend.user.entity.UserStatus;
+
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,6 +43,43 @@ class AccentInsensitiveSearchIntegrationTest {
     @Autowired private EmailTemplateService emailTemplateService;
     @Autowired private ImportLogRepository importLogRepository;
     @Autowired private FormRepository formRepository;
+    @Autowired private FormSubmissionRepository formSubmissionRepository;
+
+    @Test
+    void trainingEmployeeSearchAcceptsMissingKeyword() {
+        // Run on PostgreSQL too: H2 accepts null bindings that PostgreSQL resolves as bytea.
+        User employee = saveEmployee("SEARCH001", "Dương Ngọc Hiếu", false);
+
+        var results = userRepository.searchTrainingEmployeeCandidates(null, null, null, null);
+
+        assertThat(results).extracting(User::getId).containsExactly(employee.getId());
+        assertThat(userRepository.searchTrainingEmployeeCandidates(null, "%duong%", null, null))
+                .extracting(User::getId).containsExactly(employee.getId());
+        assertThat(userRepository.searchTrainingEmployeeCandidates(null, "%khong khop%", null, null)).isEmpty();
+        assertThat(userRepository.searchTrainingEmployeeCandidates(null, null, null, null))
+                .extracting(User::getId).containsExactly(employee.getId());
+    }
+
+    @Test
+    void pagedCandidateSearchAcceptsMissingKeywordAndCountsAllMatches() {
+        saveEmployee("SEARCH001", "Dương Ngọc Hiếu", false);
+        saveEmployee("SEARCH002", "Đặng Văn An", false);
+        saveEmployee("SEARCH003", "Người đã xóa", true);
+
+        var results = userRepository.findCompetencySummaryCandidates(null, null, PageRequest.of(0, 1));
+
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    void techniqueSummaryAcceptsMissingKeyword() {
+        var results = formSubmissionRepository.summarizeCompetencyTechnique(null, null, null,
+                Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2027-01-01T00:00:00Z"),
+                PageRequest.of(0, 10));
+
+        assertThat(results).isEmpty();
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"duong", "DUONG", "dương", "DƯƠNG", "ngoc hieu", "  duong  ", "dương"})

@@ -15,6 +15,7 @@ import AppShell from '../../../shared/components/AppShell.jsx'
 import ChecklistReadOnlyVersion from '../components/ChecklistReadOnlyVersion.jsx'
 import { adminApi } from '../api/adminApi'
 import { createChecklistCode } from '../utils/formCode.js'
+import { DEFAULT_CHECKLIST_CHOICE_OPTIONS } from '../constants/checklistQuestionDefaults.js'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import '../styles/ChecklistCreatePage.css'
@@ -131,6 +132,14 @@ function createOption(index = 0) {
   }
 }
 
+function createDefaultQuestionOptions() {
+  return DEFAULT_CHECKLIST_CHOICE_OPTIONS.map(({ label, value }, index) => ({
+    ...createOption(index),
+    label,
+    value,
+  }))
+}
+
 function createQuestion() {
   return {
     id: createId(),
@@ -139,7 +148,7 @@ function createQuestion() {
     code: null,
     title: '',
     fieldType: 'SINGLE_CHOICE',
-    options: [createOption(0), createOption(1)],
+    options: createDefaultQuestionOptions(),
   }
 }
 
@@ -404,7 +413,7 @@ function ChecklistCreatePage() {
         }
 
         if (field === 'fieldType' && isChoiceField(value) && question.options.length === 0) {
-          return { ...question, [field]: value, options: [createOption(0), createOption(1)] }
+          return { ...question, [field]: value, options: createDefaultQuestionOptions() }
         }
 
         return { ...question, [field]: value }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BellOutlined,
   WarningOutlined,
@@ -87,6 +87,7 @@ function Header({
   mobileSearch,
   onAlertSummaryChange,
 }) {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
 
   const accessToken = tokenStorage.getAccessToken()
@@ -178,7 +179,13 @@ function Header({
             type="button"
             key={item.id}
             className={`notify-item${item.read ? '' : ' notify-item--unread'}`}
-            onClick={() => markAsRead(item.id)}
+            onClick={() => {
+              markAsRead(item.id)
+              if (item.deepLink) {
+                setShowNotifications(false)
+                navigate(item.deepLink)
+              }
+            }}
           >
             <div className={`notify-item__icon-wrapper notify-item__icon-wrapper--${getNotificationTone(item.type)}`}>
               {getIcon(item.type)}

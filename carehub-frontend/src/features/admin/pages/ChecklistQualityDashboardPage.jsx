@@ -179,6 +179,21 @@ function ChecklistQualityDashboardPage({ role = 'admin' }) {
   })
 
   useEffect(() => {
+    const nextSearch = search.trim()
+    if (nextSearch === appliedRoleFilters.search) return undefined
+    const timer = window.setTimeout(() => {
+      setPage(0)
+      setFilteredSelectedFormId('')
+      setSelectedDetailForm(null)
+      setDetailError('')
+      setDetailLoading(false)
+      setTrendItems([])
+      setAppliedRoleFilters((current) => ({ ...current, search: nextSearch }))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [appliedRoleFilters.search, search])
+
+  useEffect(() => {
     if (isAdmin || ownDepartmentId || departments.length > 0) return undefined
     let active = true
     async function loadScope() {

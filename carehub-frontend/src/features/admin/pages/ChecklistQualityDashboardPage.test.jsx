@@ -182,26 +182,57 @@ describe('ChecklistQualityDashboardPage', () => {
     expect(adminApi.getQualityChecklistTrend).not.toHaveBeenCalled()
   })
 
-  it('searches checklists only after applying the draft keyword', async () => {
-    renderDashboard(<ChecklistQualityDashboardPage />)
+  it.each(['admin', 'manager', 'user'])('searches and clears checklists while typing for %s', async (role) => {
+    adminApi.getQualityChecklistDashboard.mockImplementation(({ keyword }) => Promise.resolve(
+      dashboardResponse(keyword ? [secondChecklist] : [checklist, secondChecklist]),
+    ))
+    renderDashboard(<ChecklistQualityDashboardPage role={role} />)
 
-    expect(await screen.findByRole('heading', { name: 'Danh sách bảng kiểm' })).toBeInTheDocument()
+    await screen.findByText(checklist.formTitle)
     vi.clearAllMocks()
 
     fireEvent.change(screen.getByLabelText('Tìm theo tên hoặc mã quy trình'), {
-      target: { value: 'thay bang' },
+      target: { value: 'thay' },
+    })
+    fireEvent.change(screen.getByLabelText('Tìm theo tên hoặc mã quy trình'), {
+      target: { value: '  thay bang  ' },
     })
     expect(adminApi.getQualityChecklistDashboard).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: /Bộ lọc/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
 
     await waitFor(() => {
       expect(adminApi.getQualityChecklistDashboard).toHaveBeenCalledWith(expect.objectContaining({
         keyword: 'thay bang',
         view: 'FILTERED',
+        departmentId: role === 'manager' ? '7' : undefined,
       }))
     })
+    expect(adminApi.getQualityChecklistDashboard).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(checklist.formTitle)).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Tìm theo tên hoặc mã quy trình'), { target: { value: '' } })
+    await screen.findByText(checklist.formTitle)
+    expect(adminApi.getQualityChecklistDashboard).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: undefined }))
+  })
+
+  it('resets pagination before requesting a new keyword', async () => {
+    adminApi.getQualityChecklistDashboard.mockImplementation(({ page }) => {
+      const response = dashboardResponse([checklist])
+      return Promise.resolve({ data: { data: { ...response.data.data, page, totalElements: 30, totalPages: 3 } } })
+    })
+    renderDashboard(<ChecklistQualityDashboardPage />)
+    await screen.findByText(checklist.formTitle)
+    fireEvent.click(screen.getByRole('button', { name: 'Trang sau' }))
+    await waitFor(() => expect(adminApi.getQualityChecklistDashboard).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1 }),
+    ))
+    adminApi.getQualityChecklistDashboard.mockClear()
+
+    fireEvent.change(screen.getByLabelText('Tìm theo tên hoặc mã quy trình'), { target: { value: 'duong' } })
+
+    await waitFor(() => expect(adminApi.getQualityChecklistDashboard).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 0, keyword: 'duong' }),
+    ))
+    expect(adminApi.getQualityChecklistDashboard).toHaveBeenCalledTimes(1)
   })
 
   it('restores the selected checklist detail from return query params', async () => {
