@@ -1,3 +1,4 @@
+-- Versions 32 and 33 are already used by the production exam migrations.
 -- Shared text folding for paginated searches. No extension or data rewrite is required.
 CREATE OR REPLACE FUNCTION carehub_search_text(value text)
 RETURNS text
