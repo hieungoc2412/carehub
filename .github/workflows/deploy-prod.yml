@@ -5,6 +5,10 @@ on:
     branches:
       - production
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,10 +21,15 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
+          command_timeout: 30m
           script: |
+            set -eu
             cd /opt/carehub
             git fetch origin production
             git checkout production
-            git pull origin production
-            docker compose --env-file ./carehub-backend/.env.prod -f compose.prod.yml up -d --build
+            git merge --ff-only origin/production
+            test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+            python3 scripts/check_flyway_migrations.py carehub-backend/src/main/resources/db/migration
+            docker compose --env-file ./carehub-backend/.env.prod -f compose.prod.yml build backend frontend
+            docker compose --env-file ./carehub-backend/.env.prod -f compose.prod.yml up -d --no-build --wait --wait-timeout 300
             docker image prune -f

@@ -24,6 +24,17 @@ function moderationStatusOf(field) {
   return field?.code?.startsWith('CUSTOM_') && !field?.active ? 'PENDING' : 'APPROVED'
 }
 
+function formatProposalDate(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${date.getFullYear()} ${hour}:${minute}`
+}
+
 function validateForm(form) {
   const errors = { ...EMPTY_FORM_ERRORS }
   const code = form.code.trim()
@@ -341,20 +352,26 @@ function ProfessionalFieldManagementPage() {
                 </AppliedFilterToolbar>
               </div>
               <div className="pfm-table-container">
-                <table className="admin-table-uppercase">
-                  <thead><tr><th>Mã</th><th>Tên lĩnh vực</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+                <table className="pfm-table admin-table-uppercase">
+                  <colgroup>
+                    <col />
+                    <col className="pfm-table__proposer" />
+                    <col className="pfm-table__date" />
+                    <col className="pfm-table__status" />
+                    <col className="pfm-table__actions" />
+                  </colgroup>
+                  <thead><tr><th scope="col">Tên lĩnh vực</th><th scope="col">Người đề xuất</th><th scope="col">Ngày đề xuất</th><th scope="col">Trạng thái</th><th scope="col">Hành động</th></tr></thead>
                   <tbody>
-                    {loading ? <tr><td colSpan={4}>Đang tải...</td></tr> : fields.length === 0 ? <tr><td colSpan={4}>Chưa có lĩnh vực phù hợp.</td></tr> : fields.map(field => (
+                    {loading ? <tr><td colSpan={5}>Đang tải...</td></tr> : fields.length === 0 ? <tr><td colSpan={5}>Chưa có lĩnh vực phù hợp.</td></tr> : fields.map(field => (
                       <tr key={field.id}>
-                        <td><code>{field.code}</code></td>
                          <td>
                            <strong>{field.name}</strong>
-                           <small>
-                             {moderationStatusOf(field) === 'REJECTED' && field.rejectionReason
-                               ? `Lý do: ${field.rejectionReason}`
-                               : field.description || 'Không có mô tả'}
-                           </small>
+                           {moderationStatusOf(field) === 'REJECTED' && field.rejectionReason
+                             ? <small>Lý do: {field.rejectionReason}</small>
+                             : !field.proposerName && <small>{field.description || 'Không có mô tả'}</small>}
                          </td>
+                        <td>{field.proposerName || '—'}</td>
+                        <td className="pfm-proposal-date">{formatProposalDate(field.createdAt)}</td>
                         <td>
                           {moderationStatusOf(field) === 'REJECTED' ? (
                             <span className="pfm-status pfm-status--rejected">Đã từ chối</span>

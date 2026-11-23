@@ -96,8 +96,20 @@ public class ProfessionalFieldAdminService {
         return new ProfessionalFieldResponse(
                 field.getId(), field.getCode(), field.getName(), field.getDescription(),
                 field.isActive(), field.getModerationStatus(), field.getRejectionReason(),
-                field.getVersion(), field.getUpdatedAt()
+                field.getVersion(), field.getUpdatedAt(), proposerName(field), field.getCreatedAt()
         );
+    }
+
+    private String proposerName(ProfessionalField field) {
+        // Existing proposals store the original employee name in this description.
+        // updatedBy can be the moderator and must not be used as the proposer.
+        String prefix = "Tự đề xuất bởi nhân viên:";
+        String description = field.getDescription();
+        if (description == null || !description.startsWith(prefix)) return null;
+        String name = description.substring(prefix.length())
+                .replaceFirst("\\s*\\(Chờ duyệt\\)\\s*$", "")
+                .trim();
+        return name.isEmpty() ? null : name;
     }
 
     private String normalizeCode(String code) {

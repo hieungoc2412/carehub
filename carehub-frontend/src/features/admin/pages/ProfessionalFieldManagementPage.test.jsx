@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import ProfessionalFieldManagementPage from './ProfessionalFieldManagementPage.jsx'
@@ -30,9 +30,9 @@ afterAll(() => {
   globalThis.React = previousReact
 })
 
-function renderPage() {
+function renderPage(path = '/admin/training/professional-fields') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <ProfessionalFieldManagementPage />
     </MemoryRouter>,
   )
@@ -46,6 +46,37 @@ describe('ProfessionalFieldManagementPage create form', () => {
     })
     adminApi.createProfessionalField.mockResolvedValue({ data: { data: {} } })
     adminApi.rejectProfessionalField.mockResolvedValue({ data: { data: {} } })
+  })
+
+  it('shows proposer and creation date instead of code for a pending proposal', async () => {
+    adminApi.getProfessionalFields.mockResolvedValue({ data: { data: { content: [{
+      id: 7, code: 'CUSTOM_7', name: 'Điều dưỡng nhi', active: false, moderationStatus: 'PENDING',
+      description: 'Tự đề xuất bởi nhân viên: Dương Ngọc Hiếu (Chờ duyệt)',
+      proposerName: 'Dương Ngọc Hiếu', createdAt: '2026-10-23T10:27:00', updatedAt: '2026-11-23T15:00:00',
+    }] } } })
+    renderPage('/admin/training/professional-fields?tab=pending')
+
+    const row = (await screen.findByText('Điều dưỡng nhi')).closest('tr')
+    expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual([
+      'Tên lĩnh vực', 'Người đề xuất', 'Ngày đề xuất', 'Trạng thái', 'Hành động',
+    ])
+    expect(within(row).getByText('Dương Ngọc Hiếu')).toBeInTheDocument()
+    expect(within(row).getByText('23/10/2026 10:27')).toBeInTheDocument()
+    expect(within(row).queryByText('CUSTOM_7')).not.toBeInTheDocument()
+    expect(within(row).queryByText(/Tự đề xuất bởi/)).not.toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Phê duyệt lĩnh vực Điều dưỡng nhi' })).toBeInTheDocument()
+  })
+
+  it.each([undefined, 'invalid-date'])('does not invent proposer or proposal date when metadata is missing (%s)', async (createdAt) => {
+    adminApi.getProfessionalFields.mockResolvedValue({ data: { data: { content: [{
+      id: 8, code: 'CUSTOM_8', name: 'Lĩnh vực cũ', active: false, moderationStatus: 'REJECTED',
+      createdAt, updatedAt: '2026-11-23T15:00:00', rejectionReason: 'Trùng lĩnh vực',
+    }] } } })
+    renderPage('/admin/training/professional-fields?tab=rejected')
+
+    const row = (await screen.findByText('Lĩnh vực cũ')).closest('tr')
+    expect(within(row).getAllByText('—')).toHaveLength(2)
+    expect(within(row).getByText('Lý do: Trùng lĩnh vực')).toBeInTheDocument()
   })
 
   it('shows field-level validation in the create modal', async () => {

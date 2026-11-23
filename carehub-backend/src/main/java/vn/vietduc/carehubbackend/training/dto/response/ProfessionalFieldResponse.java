@@ -13,6 +13,8 @@ public record ProfessionalFieldResponse(
         ProfessionalFieldModerationStatus moderationStatus,
         String rejectionReason,
         Long version,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String proposerName,
+        LocalDateTime createdAt
 ) {
 }

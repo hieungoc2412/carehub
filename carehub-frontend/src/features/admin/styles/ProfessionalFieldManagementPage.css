@@ -466,6 +466,29 @@
   border-collapse: collapse;
 }
 
+.pfm-list .pfm-table {
+  table-layout: fixed;
+  min-width: 1000px;
+}
+
+.pfm-table__proposer { width: 220px; }
+.pfm-table__date { width: 175px; }
+.pfm-table__status { width: 130px; }
+.pfm-table__actions { width: 160px; }
+
+.pfm-table td {
+  overflow-wrap: anywhere;
+}
+
+.pfm-proposal-date,
+.pfm-table .pfm-status {
+  white-space: nowrap;
+}
+
+.pfm-table .pfm-row-actions {
+  flex-wrap: nowrap;
+}
+
 .pfm-list th {
   padding: 14px 24px;
   border-bottom: 1px solid #e2e8f0;
@@ -487,16 +510,6 @@
 
 .pfm-list tr:hover td {
   background: #f8fafc;
-}
-
-.pfm-list td code {
-  background: #f1f5f9;
-  color: #0f172a;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid #e2e8f0;
 }
 
 .pfm-list td strong {

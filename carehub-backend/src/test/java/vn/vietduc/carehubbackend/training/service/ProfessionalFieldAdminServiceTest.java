@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import vn.vietduc.carehubbackend.exception.ConflictException;
 import vn.vietduc.carehubbackend.training.dto.request.ProfessionalFieldFormRequest;
 import vn.vietduc.carehubbackend.training.entity.ProfessionalField;
@@ -12,10 +14,14 @@ import vn.vietduc.carehubbackend.training.enums.ProfessionalFieldModerationStatu
 import vn.vietduc.carehubbackend.training.repository.ProfessionalFieldRepository;
 
 import java.util.Optional;
+import java.util.List;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -74,5 +80,40 @@ class ProfessionalFieldAdminServiceTest {
         assertEquals(ProfessionalFieldModerationStatus.REJECTED, response.moderationStatus());
         assertEquals(null, response.rejectionReason());
         assertEquals(false, response.active());
+    }
+
+    @Test
+    void exposesOriginalProposerAndCreationTimeAfterModeration() {
+        LocalDateTime proposedAt = LocalDateTime.of(2026, 10, 23, 10, 27);
+        ProfessionalField field = ProfessionalField.builder()
+                .id(10L).code("CUSTOM_10").name("Điều dưỡng nhi")
+                .description("Tự đề xuất bởi nhân viên: Dương Ngọc Hiếu (Chờ duyệt)")
+                .createdAt(proposedAt).updatedAt(proposedAt.plusDays(3)).updatedBy("admin")
+                .moderationStatus(ProfessionalFieldModerationStatus.APPROVED).active(true).build();
+        when(repository.search(isNull(), isNull(), any())).thenReturn(new PageImpl<>(List.of(field)));
+
+        var result = service.search(null, null, PageRequest.of(0, 20)).getContent().get(0);
+
+        assertEquals("Dương Ngọc Hiếu", result.proposerName());
+        assertEquals(proposedAt, result.createdAt());
+        assertEquals(proposedAt.plusDays(3), result.updatedAt());
+        assertEquals(field.getDescription(), result.description());
+    }
+
+    @Test
+    void leavesProposerUnknownForCatalogDescriptionsAndMissingMetadata() {
+        ProfessionalField catalog = ProfessionalField.builder()
+                .code("CAP_CUU").name("Cấp cứu").description("Mô tả lĩnh vực").updatedBy("admin").build();
+        ProfessionalField missing = ProfessionalField.builder()
+                .code("CUSTOM_11").name("Lĩnh vực cũ").build();
+        ProfessionalField emptyName = ProfessionalField.builder()
+                .code("CUSTOM_12").name("Lĩnh vực khác")
+                .description("Tự đề xuất bởi nhân viên:  (Chờ duyệt)").build();
+        when(repository.search(isNull(), isNull(), any())).thenReturn(new PageImpl<>(List.of(catalog, missing, emptyName)));
+
+        var results = service.search(null, null, PageRequest.of(0, 20)).getContent();
+
+        results.forEach(result -> assertNull(result.proposerName()));
+        results.forEach(result -> assertNull(result.createdAt()));
     }
 }
