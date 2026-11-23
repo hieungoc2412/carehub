@@ -8,9 +8,20 @@ import { apiData, apiErrorMessage, formatDateTime, formatNumber } from '../../..
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import PassFailBadge from '../../../shared/components/PassFailBadge.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 
 function examDisplayName(attempt) {
   return attempt?.assignmentName || attempt?.examPaperName || 'Bài kiểm tra'
+}
+const HISTORY_SORT_COLUMNS = {
+  examName: examDisplayName,
+  submittedAt: { getValue: attempt => attempt.submittedAt, type: 'date' },
+  professionalFieldName: attempt => attempt.professionalFieldName,
+  score: { getValue: attempt => attempt.score, type: 'number' },
+  passed: { getValue: attempt => attempt.passed, type: 'boolean' },
+  timeSpentSeconds: { getValue: attempt => attempt.timeSpentSeconds, type: 'number' },
+  attemptNumber: { getValue: attempt => attempt.attemptNumber, type: 'number' },
 }
 
 function ExamHistoryScreen() {
@@ -21,6 +32,7 @@ function ExamHistoryScreen() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [professionalFieldId, setProfessionalFieldId] = useState('')
   const [loading, setLoading] = useState(true)
+  const { sort, toggleSort } = useTableSort()
 
   useEffect(() => {
     async function loadAttempts() {
@@ -80,6 +92,10 @@ function ExamHistoryScreen() {
         name: attempt.professionalFieldName || attempt.professionalFieldCode,
       }]),
   ).values()), [attempts])
+  const displayedAttempts = useMemo(
+    () => sortTableRows(filtered, sort, HISTORY_SORT_COLUMNS),
+    [filtered, sort],
+  )
 
   async function viewAttempt(attempt) {
     try {
@@ -153,22 +169,22 @@ function ExamHistoryScreen() {
           <table className="eh-table eh-table--cards">
             <thead>
               <tr>
-                <th>Tên bài thi</th>
-                <th>Ngày nộp</th>
-                <th>Lĩnh vực chuyên môn</th>
-                <th>Điểm số</th>
-                <th>Kết quả</th>
-                <th>Thời gian</th>
-                <th>Lượt</th>
+                <SortableTableHeader sortKey="examName" sort={sort} onSort={toggleSort}>Tên bài thi</SortableTableHeader>
+                <SortableTableHeader sortKey="submittedAt" sort={sort} onSort={toggleSort}>Ngày nộp</SortableTableHeader>
+                <SortableTableHeader sortKey="professionalFieldName" sort={sort} onSort={toggleSort}>Lĩnh vực chuyên môn</SortableTableHeader>
+                <SortableTableHeader sortKey="score" sort={sort} onSort={toggleSort}>Điểm số</SortableTableHeader>
+                <SortableTableHeader sortKey="passed" sort={sort} onSort={toggleSort}>Kết quả</SortableTableHeader>
+                <SortableTableHeader sortKey="timeSpentSeconds" sort={sort} onSort={toggleSort}>Thời gian</SortableTableHeader>
+                <SortableTableHeader sortKey="attemptNumber" sort={sort} onSort={toggleSort}>Lượt</SortableTableHeader>
                 <th>Hành động</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr><td colSpan="8">Đang tải lịch sử thi...</td></tr>
-              ) : filtered.length === 0 ? (
+              ) : displayedAttempts.length === 0 ? (
                 <tr><td colSpan="8">Chưa có lịch sử thi.</td></tr>
-              ) : filtered.map((attempt) => (
+              ) : displayedAttempts.map((attempt) => (
                 <tr key={attempt.id}>
                   <td data-label="Tên bài thi">{examDisplayName(attempt)}</td>
                   <td data-label="Ngày nộp">{formatDateTime(attempt.submittedAt)}</td>

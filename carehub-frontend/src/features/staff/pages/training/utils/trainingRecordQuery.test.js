@@ -18,6 +18,8 @@ describe('training record query helpers', () => {
         dateTo: '2026-12-31',
         professionalFieldId: '12',
         activityTypeId: '',
+        sortField: '',
+        sortDirection: '',
         page: 3,
       })
     expect(parseTrainingQuery('?status=unknown&dateFrom=2026-02-30&page=0')).toMatchObject({
@@ -51,6 +53,13 @@ describe('training record query helpers', () => {
       activityTypeId: 4,
       employeeId: 42,
     })
+  })
+
+  it('keeps a valid table sort in the URL and API parameters', () => {
+    const filters = parseTrainingQuery('?sortField=declaredHours&sortDirection=desc&page=2')
+    expect(filters).toMatchObject({ sortField: 'declaredHours', sortDirection: 'desc', page: 2 })
+    expect(serializeTrainingQuery(filters).toString()).toContain('sortField=declaredHours&sortDirection=desc')
+    expect(toTrainingListApiParams(filters).sort).toBe('declaredHours,desc')
   })
 
   it('validates date ranges and counts active groups', () => {

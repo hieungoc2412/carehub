@@ -14,6 +14,8 @@ import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
 import AdminFilterDisclosure from '../../../shared/components/AdminFilterDisclosure.jsx'
 import FilterActionButtons from '../../../shared/components/FilterActionButtons.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { documentQuestionApi } from '../api/documentQuestionApi.js'
 import { questionCategoryApi } from '../api/questionCategoryApi.js'
@@ -50,6 +52,7 @@ function QuestionDocumentDetailPage() {
   const [categoryForm, setCategoryForm] = useState({ name: '', code: '', description: '' })
   const [isCreatingJob, setIsCreatingJob] = useState(false)
   const [jobStatusFilter, setJobStatusFilter] = useState('')
+  const { sort, toggleSort } = useTableSort()
 
   const loadDocument = useCallback(async () => {
     setIsLoading(true)
@@ -77,9 +80,15 @@ function QuestionDocumentDetailPage() {
     return chunks.filter((chunk) => chunkGenerationEligible(chunk)).length
   }, [chunks])
   const skippedChunkCount = Math.max(0, chunks.length - eligibleChunkCount)
-  const filteredQuestionJobs = useMemo(() => {
-    return questionJobs.filter((job) => !jobStatusFilter || job.status === jobStatusFilter)
-  }, [questionJobs, jobStatusFilter])
+  const filteredQuestionJobs = useMemo(() => sortTableRows(
+    questionJobs.filter((job) => !jobStatusFilter || job.status === jobStatusFilter),
+    sort,
+    {
+      id: { getValue: job => job.id, type: 'number' },
+      status: job => job.status,
+      createdAt: { getValue: job => job.createdAt, type: 'date' },
+    },
+  ), [jobStatusFilter, questionJobs, sort])
 
   const handleApplyFilters = () => {
     // keep immediate filter behavior
@@ -280,12 +289,12 @@ function QuestionDocumentDetailPage() {
                           <table className="qdoc-table">
                           <thead>
                             <tr>
-                              <th>Phiên</th>
-                              <th>Trạng thái</th>
+                              <SortableTableHeader label="Phiên" field="id" sort={sort} onSort={toggleSort} />
+                              <SortableTableHeader label="Trạng thái" field="status" sort={sort} onSort={toggleSort} />
                               <th>Pipeline / prompt</th>
                               <th>Câu hỏi</th>
                               <th>Tiến độ xử lý</th>
-                              <th>Ngày tạo</th>
+                              <SortableTableHeader label="Ngày tạo" field="createdAt" sort={sort} onSort={toggleSort} />
                               <th>Hành động</th>
                             </tr>
                           </thead>

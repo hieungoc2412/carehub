@@ -3,6 +3,8 @@ import { DownloadOutlined, EyeOutlined, ReloadOutlined, SearchOutlined } from '@
 import AdminFilterDisclosure from '../../../shared/components/AdminFilterDisclosure.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { evaluationImportApi } from '../api/evaluationImportApi.js'
 import { apiData, apiErrorMessage, formatDateTime } from '../utils/documentQuestionUi.js'
@@ -15,6 +17,7 @@ function EvaluationImportHistoryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
+  const { sort, toggleSort } = useTableSort()
 
   const loadImports = useCallback(async () => {
     setIsLoading(true)
@@ -32,7 +35,16 @@ function EvaluationImportHistoryPage() {
     loadImports()
   }, [loadImports])
 
-  const rows = useMemo(() => imports, [imports])
+  const rows = useMemo(() => sortTableRows(imports, sort, {
+    id: { getValue: item => item.id, type: 'number' },
+    importType: item => item.importTypeText || item.importType,
+    fileName: item => item.fileName,
+    status: item => item.status,
+    totalRows: { getValue: item => item.totalRows, type: 'number' },
+    createdRows: { getValue: item => item.createdRows, type: 'number' },
+    skippedRows: { getValue: item => item.skippedRows, type: 'number' },
+    createdAt: { getValue: item => item.createdAt, type: 'date' },
+  }), [imports, sort])
 
   async function viewImport(importJob) {
     try {
@@ -97,15 +109,15 @@ function EvaluationImportHistoryPage() {
                 <table className="exp-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th>Mã</th>
-                      <th>Loại import</th>
-                      <th>File</th>
-                      <th>Trạng thái</th>
-                      <th>Dòng</th>
-                      <th>Đã lưu</th>
-                      <th>Bỏ qua</th>
+                      <SortableTableHeader sortKey="id" sort={sort} onSort={toggleSort}>Mã</SortableTableHeader>
+                      <SortableTableHeader sortKey="importType" sort={sort} onSort={toggleSort}>Loại import</SortableTableHeader>
+                      <SortableTableHeader sortKey="fileName" sort={sort} onSort={toggleSort}>File</SortableTableHeader>
+                      <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
+                      <SortableTableHeader sortKey="totalRows" sort={sort} onSort={toggleSort}>Dòng</SortableTableHeader>
+                      <SortableTableHeader sortKey="createdRows" sort={sort} onSort={toggleSort}>Đã lưu</SortableTableHeader>
+                      <SortableTableHeader sortKey="skippedRows" sort={sort} onSort={toggleSort}>Bỏ qua</SortableTableHeader>
                       <th>Người import</th>
-                      <th>Thời gian</th>
+                      <SortableTableHeader sortKey="createdAt" sort={sort} onSort={toggleSort}>Thời gian</SortableTableHeader>
                       <th style={{ width: 90 }}>Hành động</th>
                     </tr>
                   </thead>

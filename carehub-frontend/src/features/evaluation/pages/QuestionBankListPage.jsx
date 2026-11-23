@@ -7,9 +7,7 @@ import {
   DownloadOutlined,
   ExclamationCircleOutlined,
   ExportOutlined,
-  FileExcelOutlined,
   FormOutlined,
-  InfoCircleOutlined,
   LoadingOutlined,
   PlusCircleOutlined,
   UploadOutlined,
@@ -20,6 +18,8 @@ import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { questionBankApi } from '../api/questionBankApi.js'
 import { apiData, apiErrorMessage, cognitiveLevelText, COGNITIVE_LEVELS, normalizeText } from '../utils/documentQuestionUi.js'
@@ -108,6 +108,7 @@ function QuestionBankListPage() {
   const [appliedFilters, setAppliedFilters] = useState({ keyword: '', category: '', cognitiveLevel: '', status: '' })
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [page, setPage] = useState(0)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
   const [questionToArchive, setQuestionToArchive] = useState(null)
 
   const loadQuestions = useCallback(async () => {
@@ -162,9 +163,15 @@ function QuestionBankListPage() {
   }, [appliedFilters, questions])
 
   const pageSize = 10
-  const totalElements = filteredQuestions.length
+  const sortedQuestions = useMemo(() => sortTableRows(filteredQuestions, sort, {
+    content: question => question.content,
+    category: question => question.category,
+    professionalFieldName: question => question.professionalFieldName,
+    status: question => question.status,
+  }), [filteredQuestions, sort])
+  const totalElements = sortedQuestions.length
   const totalPages = Math.ceil(totalElements / pageSize) || 1
-  const displayRows = filteredQuestions.slice(page * pageSize, (page + 1) * pageSize)
+  const displayRows = sortedQuestions.slice(page * pageSize, (page + 1) * pageSize)
   const activeFilterCount = [categoryFilter, cognitiveLevelFilter, statusFilter].filter(Boolean).length
 
   async function handleDelete(item) {
@@ -503,10 +510,10 @@ function QuestionBankListPage() {
                   </colgroup>
                   <thead>
                     <tr>
-                      <th>Nội dung câu hỏi</th>
-                      <th>Danh mục</th>
-                      <th>Lĩnh vực chuyên môn</th>
-                      <th>Trạng thái</th>
+                      <SortableTableHeader sortKey="content" sort={sort} onSort={toggleSort}>Nội dung câu hỏi</SortableTableHeader>
+                      <SortableTableHeader sortKey="category" sort={sort} onSort={toggleSort}>Danh mục</SortableTableHeader>
+                      <SortableTableHeader sortKey="professionalFieldName" sort={sort} onSort={toggleSort}>Lĩnh vực chuyên môn</SortableTableHeader>
+                      <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                       <th>Hành động</th>
                     </tr>
                   </thead>

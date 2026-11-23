@@ -7,12 +7,14 @@ import AppliedFilterToolbar from '../../../../shared/components/AppliedFilterToo
 import KeyboardDatePicker from '../../../../shared/components/KeyboardDatePicker.jsx'
 import LoadingState from '../../../../shared/components/LoadingState.jsx'
 import EmptyState from '../../../../shared/components/EmptyState.jsx'
+import SortableTableHeader from '../../../../shared/components/SortableTableHeader.jsx'
 import FilterActionButtons from '../../../../shared/components/FilterActionButtons.jsx'
 import { myCompetencyApi } from '../../../evaluation/api/myCompetencyApi.js'
 import { indexAnswersByQuestion, resolveStepRating } from '../../utils/checklistRating.js'
 import { apiData, apiErrorMessage, formatNumber } from '../../../../shared/utils/apiUi.js'
 import { useToast } from '../../../../shared/context/ToastContext.jsx'
 import { validateHistoricalDateRange } from '../../../../shared/utils/dateRange.js'
+import { sortTableRows, useTableSort } from '../../../../shared/utils/tableSort.js'
 import '../../styles/StaffCompetencyPage.css'
 
 const localToday = () => {
@@ -46,6 +48,7 @@ export default function StaffCompetencyPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailAttempts, setDetailAttempts] = useState([])
   const [activeSubmissionId, setActiveSubmissionId] = useState(null)
+  const { sort, toggleSort } = useTableSort()
 
   useEffect(() => {
     setDraftFilters({ q: query, dateFrom: fromDate, dateTo: toDate })
@@ -78,6 +81,10 @@ export default function StaffCompetencyPage() {
     if (!query) return data?.items || []
     return (data?.items || []).filter(item => matchesSearch(String(item.formName || ''), query))
   }, [data, query])
+  const displayedItems = useMemo(() => sortTableRows(visibleItems, sort, {
+    formName: item => item.formName,
+    passRate: item => Number(item.passRate || 0),
+  }, item => item.formId), [sort, visibleItems])
 
   // Người được chấm quan tâm "bước nào bị trừ điểm", không phải điểm quy đổi của từng bước,
   // nên mỗi bước hiển thị bằng mức đánh giá mà người chấm đã chọn.
@@ -235,8 +242,8 @@ export default function StaffCompetencyPage() {
                 <col className="sc-table__rate-col" />
                 <col className="sc-table__action-col" />
               </colgroup>
-              <thead><tr><th>Quy trình</th><th>Số lượt đạt/tổng lượt</th><th>Tỷ lệ tuân thủ</th><th>Hành động</th></tr></thead><tbody>
-              {visibleItems.map(item => <tr key={item.formId}>
+              <thead><tr><SortableTableHeader label="Quy trình" field="formName" sort={sort} onSort={toggleSort} /><th>Số lượt đạt/tổng lượt</th><SortableTableHeader label="Tỷ lệ tuân thủ" field="passRate" sort={sort} onSort={toggleSort} /><th>Hành động</th></tr></thead><tbody>
+              {displayedItems.map(item => <tr key={item.formId}>
                 <td data-label="Quy trình"><strong className="sc-table__process-name">{item.formName}</strong></td>
                 <td data-label="Đạt / Tổng"><span className="sc-table__metric">{item.passCount || 0}/{item.evaluationCount || 0}</span></td>
                 <td data-label="Tỷ lệ"><strong className={`sc-table__rate${Number(item.passRate || 0) < 50 ? ' is-low' : ''}`}>{formatNumber(item.passRate || 0)}%</strong></td>

@@ -1,16 +1,30 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { LoadingOutlined } from '@ant-design/icons'
 import AppShell from '../../../../shared/components/AppShell.jsx'
 import { examAssignmentApi } from '../../../../features/evaluation/api/examAssignmentApi'
 import { formatNumber } from '../../../../shared/utils/apiUi.js'
 import '../../styles/ManagerPages.css'
+import SortableTableHeader from '../../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../../shared/utils/tableSort.js'
+
+const RESULT_SORT_COLUMNS = {
+  bestScore: { getValue: item => item.bestScore ?? item.latestScore, type: 'number' },
+  violations: { getValue: item => item.latestTabSwitchCount ?? item.tabSwitchCount, type: 'number' },
+  passed: { getValue: item => item.bestPassed ?? item.latestPassed, type: 'boolean' },
+  duration: { getValue: item => item.latestTimeSpentSeconds ?? item.timeSpentSeconds, type: 'number' },
+}
 
 function ManagerExamResultDetailPage() {
   const { id } = useParams()
 
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(true)
+  const { sort, toggleSort } = useTableSort()
+  const displayedResults = useMemo(
+    () => sortTableRows(results, sort, RESULT_SORT_COLUMNS, item => item.userId ?? item.id),
+    [results, sort],
+  )
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -66,10 +80,10 @@ function ManagerExamResultDetailPage() {
           <thead>
             <tr>
               <th>Nhân viên</th>
-              <th>Điểm cao nhất</th>
-              <th>Giám sát</th>
-              <th>Kết quả</th>
-              <th>Thời gian (lượt mới nhất)</th>
+              <SortableTableHeader sortKey="bestScore" sort={sort} onSort={toggleSort}>Điểm cao nhất</SortableTableHeader>
+              <SortableTableHeader sortKey="violations" sort={sort} onSort={toggleSort}>Giám sát</SortableTableHeader>
+              <SortableTableHeader sortKey="passed" sort={sort} onSort={toggleSort}>Kết quả</SortableTableHeader>
+              <SortableTableHeader sortKey="duration" sort={sort} onSort={toggleSort}>Thời gian (lượt mới nhất)</SortableTableHeader>
             </tr>
           </thead>
           <tbody>
@@ -80,7 +94,7 @@ function ManagerExamResultDetailPage() {
                 </td>
               </tr>
             ) : (
-              results.map((item, idx) => {
+              displayedResults.map((item, idx) => {
                 const score = item.bestScore ?? item.latestScore
                 const badge = getStatusBadge(item)
                 const showLatest = item.latestScore != null

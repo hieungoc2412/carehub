@@ -40,6 +40,19 @@ public class FormScoringConfigurationService {
     @Transactional(readOnly = true)
     public Page<FormScoringConfigurationResponse> search(String keyword, FormVersionStatus status,
                                                          Pageable pageable) {
+        boolean responseSort = pageable.getSort().stream().anyMatch(order ->
+                Set.of("passingScore", "submittedCount").contains(order.getProperty()));
+        if (responseSort) {
+            if (pageable.getPageSize() < 1 || pageable.getPageSize() > MAX_PAGE_SIZE) {
+                throw ValidationException.field("size", "Page size must be between 1 and " + MAX_PAGE_SIZE);
+            }
+            List<FormScoringConfigurationResponse> responses = versionRepository.searchScoringConfigurations(
+                    keyword == null ? "" : keyword.trim(), status, Pageable.unpaged())
+                    .stream().map(version -> toResponse(version, null)).sorted(responseComparator(pageable.getSort())).toList();
+            int from = Math.min((int) pageable.getOffset(), responses.size());
+            int to = Math.min(from + pageable.getPageSize(), responses.size());
+            return new PageImpl<>(responses.subList(from, to), pageable, responses.size());
+        }
         Page<FormVersion> versions = versionRepository.searchScoringConfigurations(
                 keyword == null ? "" : keyword.trim(), status, normalize(pageable));
         return versions.map(version -> toResponse(version, null));
@@ -183,5 +196,25 @@ public class FormScoringConfigurationService {
                 }).toList())
                 : Sort.by(Sort.Order.desc("updatedAt"));
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+    }
+
+    private Comparator<FormScoringConfigurationResponse> responseComparator(Sort sort) {
+        Comparator<FormScoringConfigurationResponse> comparator = null;
+        for (Sort.Order order : sort) {
+            Comparator<FormScoringConfigurationResponse> next = switch (order.getProperty()) {
+                case "passingScore" -> {
+                    Comparator<BigDecimal> values = order.isAscending()
+                            ? Comparator.naturalOrder() : Comparator.reverseOrder();
+                    yield Comparator.comparing(FormScoringConfigurationResponse::passingScore,
+                            Comparator.nullsLast(values));
+                }
+                case "submittedCount" -> Comparator.comparingLong(FormScoringConfigurationResponse::submittedCount);
+                default -> throw ValidationException.field("sort", "Trường sắp xếp không được hỗ trợ: " + order.getProperty());
+            };
+            if (order.isDescending() && !"passingScore".equals(order.getProperty())) next = next.reversed();
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        return (comparator == null ? Comparator.comparing(FormScoringConfigurationResponse::versionId) : comparator)
+                .thenComparing(FormScoringConfigurationResponse::versionId);
     }
 }

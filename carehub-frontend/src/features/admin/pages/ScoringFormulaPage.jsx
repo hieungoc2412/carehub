@@ -12,6 +12,8 @@ import AppShell from '../../../shared/components/AppShell.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import { adminApi } from '../api/adminApi.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import '../styles/ScoringFormulaPage.css'
@@ -67,6 +69,7 @@ function ScoringFormulaPage() {
   const [passingScore, setPassingScore] = useState('8.0')
   const [saving, setSaving] = useState(false)
   const [confirmSave, setConfirmSave] = useState(false)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   const loadRows = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
@@ -77,7 +80,7 @@ function ScoringFormulaPage() {
         status: appliedFilters.status || undefined,
         page,
         size: 20,
-        sort: 'updatedAt,desc',
+        sort: apiSort(sort, 'updatedAt,desc'),
       })
       const data = response.data?.data
       setRows(Array.isArray(data?.content) ? data.content : [])
@@ -88,7 +91,7 @@ function ScoringFormulaPage() {
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [appliedFilters, page])
+  }, [appliedFilters, page, sort])
 
   useEffect(() => {
     const timer = window.setTimeout(() => loadRows(), 0)
@@ -224,8 +227,8 @@ function ScoringFormulaPage() {
             ) : (
               <table className="sfp-table admin-table-uppercase">
                 <thead><tr>
-                  <th>Quy trình</th><th>Phiên bản</th><th>Tỷ trọng</th><th>Điểm sàn</th>
-                  <th>Bài đã nộp</th><th>Đồng bộ kết quả</th><th>Hành động</th>
+                  <SortableTableHeader label="Quy trình" field="formTitle" sort={sort} onSort={toggleSort} /><SortableTableHeader label="Phiên bản" field="versionNumber" sort={sort} onSort={toggleSort} /><th>Tỷ trọng</th><SortableTableHeader label="Điểm sàn" field="passingScore" sort={sort} onSort={toggleSort} />
+                  <SortableTableHeader label="Bài đã nộp" field="submittedCount" sort={sort} onSort={toggleSort} /><th>Đồng bộ kết quả</th><th>Hành động</th>
                 </tr></thead>
                 <tbody>{rows.map((row) => {
                   const jobStatus = row.latestJob?.status

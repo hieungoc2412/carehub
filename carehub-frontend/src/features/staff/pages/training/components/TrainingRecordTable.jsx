@@ -11,6 +11,7 @@ import {
   getTrainingStatusLabel,
   getTrainingStatusTone,
 } from '../utils/trainingRecordFormatters.js'
+import SortableTableHeader from '../../../../../shared/components/SortableTableHeader.jsx'
 
 const DEFAULT_COLUMNS = ['date', 'title', 'hours', 'submitted', 'evidence', 'actions']
 const DEFAULT_ACTIONS = {
@@ -49,6 +50,8 @@ function TrainingRecordTable({
   deletingId,
   onEvidence,
   onBodyScroll,
+  sort,
+  onSort,
 }) {
   const resolvedActions = Array.isArray(actions)
     ? actions
@@ -188,9 +191,21 @@ function TrainingRecordTable({
       <thead>
         <tr>
           {resolvedColumns.map(column => (
-            <th key={column} className={COLUMN_DEFINITIONS[column].className}>
-              {COLUMN_DEFINITIONS[column].header}
-            </th>
+            onSort && !['evidence', 'actions'].includes(column) ? (
+              <SortableTableHeader
+                key={column}
+                className={COLUMN_DEFINITIONS[column].className}
+                sortKey={column === 'date' ? 'startDate' : column === 'hours' ? 'declaredHours' : column === 'submitted' ? 'submittedAt' : column}
+                sort={sort}
+                onSort={onSort}
+              >
+                {COLUMN_DEFINITIONS[column].header}
+              </SortableTableHeader>
+            ) : (
+              <th key={column} className={COLUMN_DEFINITIONS[column].className}>
+                {COLUMN_DEFINITIONS[column].header}
+              </th>
+            )
           ))}
         </tr>
       </thead>

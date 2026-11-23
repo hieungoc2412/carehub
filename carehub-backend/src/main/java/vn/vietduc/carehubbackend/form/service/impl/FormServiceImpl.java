@@ -3,6 +3,7 @@ package vn.vietduc.carehubbackend.form.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -31,6 +32,7 @@ import vn.vietduc.carehubbackend.user.repository.DepartmentRepository;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -58,12 +60,18 @@ public class FormServiceImpl implements FormService {
             Long ownerDepartmentId,
             Pageable pageable
     ) {
+        Pageable normalized = normalizePageable(pageable);
+        String responseSortProperty = normalized.getSort().stream()
+                .map(Sort.Order::getProperty)
+                .filter(this::isResponseSortProperty)
+                .findFirst()
+                .orElse(null);
         Page<Form> forms = formRepository.search(
                 normalizeKeyword(keyword),
                 status,
                 subjectType,
                 ownerDepartmentId,
-                normalizePageable(pageable)
+                responseSortProperty == null ? normalized : Pageable.unpaged()
         );
 
         List<Long> formIds = forms.getContent().stream()
@@ -72,11 +80,21 @@ public class FormServiceImpl implements FormService {
         Map<Long, Long> activeAssignmentCounts = activeAssignmentCounts(formIds);
         Map<Long, Long> responseCounts = responseCounts(formIds);
 
-        return forms.map(form -> mapper.toResponse(
+        List<FormResponse> responses = forms.getContent().stream().map(form -> mapper.toResponse(
                 form,
                 activeAssignmentCounts.getOrDefault(form.getId(), 0L),
                 responseCounts.getOrDefault(form.getId(), 0L)
-        ));
+        )).toList();
+        if (responseSortProperty == null) {
+            return new PageImpl<>(responses, normalized, forms.getTotalElements());
+        }
+        Sort.Order order = normalized.getSort().getOrderFor(responseSortProperty);
+        List<FormResponse> sorted = responses.stream()
+                .sorted((left, right) -> compareFormResponse(left, right, responseSortProperty, order))
+                .toList();
+        int from = Math.min((int) normalized.getOffset(), sorted.size());
+        int to = Math.min(from + normalized.getPageSize(), sorted.size());
+        return new PageImpl<>(sorted.subList(from, to), normalized, sorted.size());
     }
 
     @Override
@@ -174,6 +192,10 @@ public class FormServiceImpl implements FormService {
                 "code", "code",
                 "title", "title",
                 "status", "status",
+                "versionNumber", "versionNumber",
+                "activeAssignmentCount", "activeAssignmentCount",
+                "responseCount", "responseCount",
+                "passingScore", "passingScore",
                 "createdAt", "createdAt",
                 "updatedAt", "updatedAt"
         );
@@ -187,6 +209,36 @@ public class FormServiceImpl implements FormService {
                 }).toList())
                 : Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.asc("id"));
         return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+    }
+
+    private boolean isResponseSortProperty(String property) {
+        return List.of("versionNumber", "activeAssignmentCount", "responseCount", "passingScore")
+                .contains(property);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private int compareFormResponse(FormResponse left, FormResponse right, String property, Sort.Order order) {
+        Comparable leftValue = switch (property) {
+            case "versionNumber" -> left.currentPublishedVersion() == null ? null : left.currentPublishedVersion().versionNumber();
+            case "activeAssignmentCount" -> left.activeAssignmentCount();
+            case "responseCount" -> left.responseCount();
+            case "passingScore" -> left.currentPublishedVersion() == null ? null : left.currentPublishedVersion().passingScore();
+            default -> null;
+        };
+        Comparable rightValue = switch (property) {
+            case "versionNumber" -> right.currentPublishedVersion() == null ? null : right.currentPublishedVersion().versionNumber();
+            case "activeAssignmentCount" -> right.activeAssignmentCount();
+            case "responseCount" -> right.responseCount();
+            case "passingScore" -> right.currentPublishedVersion() == null ? null : right.currentPublishedVersion().passingScore();
+            default -> null;
+        };
+        if (leftValue == null || rightValue == null) {
+            if (leftValue == rightValue) return left.id().compareTo(right.id());
+            return leftValue == null ? 1 : -1;
+        }
+        int compared = leftValue.compareTo(rightValue);
+        if (compared == 0) return left.id().compareTo(right.id());
+        return order != null && order.isDescending() ? -compared : compared;
     }
 
     private Map<Long, Long> activeAssignmentCounts(List<Long> formIds) {

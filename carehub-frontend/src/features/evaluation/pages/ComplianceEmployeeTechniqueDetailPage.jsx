@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ReloadOutlined,
@@ -11,6 +11,22 @@ import { tokenStorage } from '../../../shared/auth/tokenStorage.js'
 import { getRolesFromAccessToken } from '../../../shared/auth/jwt.js'
 import '../styles/EvaluationDashboardPage.css'
 import PassFailBadge from '../../../shared/components/PassFailBadge.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
+
+const TECHNIQUE_SORT_COLUMNS = {
+  formName: item => item.formName,
+  evaluationCount: { getValue: item => item.evaluationCount, type: 'number' },
+  averageScore: { getValue: item => item.averageScore, type: 'number' },
+  passRate: { getValue: item => item.passRate, type: 'number' },
+  isPassed: { getValue: item => item.isPassed, type: 'boolean' },
+}
+const ATTEMPT_SORT_COLUMNS = {
+  evaluatedAt: { getValue: item => item.evaluatedAt, type: 'date' },
+  formName: item => item.formName,
+  score: { getValue: item => item.score, type: 'number' },
+  passed: { getValue: item => item.passed, type: 'boolean' },
+}
 
 function ComplianceEmployeeTechniqueDetailPage() {
   const { employeeId } = useParams()
@@ -25,6 +41,8 @@ function ComplianceEmployeeTechniqueDetailPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [expandedRow, setExpandedRow] = useState(null)
+  const { sort, toggleSort } = useTableSort()
+  const { sort: attemptSort, toggleSort: toggleAttemptSort } = useTableSort()
 
   const fromDate = searchParams.get('from') || `${new Date().getFullYear()}-01-01`
   const toDate = searchParams.get('to') || new Date().toISOString().slice(0, 10)
@@ -75,6 +93,10 @@ function ComplianceEmployeeTechniqueDetailPage() {
   const overallAvg = data?.overallAverageScore ?? null
 
   const hasData = data && data.items && data.items.length > 0
+  const displayedItems = useMemo(
+    () => sortTableRows(data?.items || [], sort, TECHNIQUE_SORT_COLUMNS, item => item.formId),
+    [data?.items, sort],
+  )
 
   return (
     <AppShell
@@ -110,12 +132,12 @@ function ComplianceEmployeeTechniqueDetailPage() {
                   <thead>
                     <tr>
                       <th style={{ width: 40 }}></th>
-                      <th>Kỹ thuật</th>
-                      <th>Số lần ĐG</th>
-                      <th>Điểm TB</th>
+                      <SortableTableHeader sortKey="formName" sort={sort} onSort={toggleSort}>Kỹ thuật</SortableTableHeader>
+                      <SortableTableHeader sortKey="evaluationCount" sort={sort} onSort={toggleSort}>Số lần ĐG</SortableTableHeader>
+                      <SortableTableHeader sortKey="averageScore" sort={sort} onSort={toggleSort}>Điểm TB</SortableTableHeader>
                       <th>Đạt/Không đạt</th>
-                      <th>Tỷ lệ</th>
-                      <th>Kết quả</th>
+                      <SortableTableHeader sortKey="passRate" sort={sort} onSort={toggleSort}>Tỷ lệ</SortableTableHeader>
+                      <SortableTableHeader sortKey="isPassed" sort={sort} onSort={toggleSort}>Kết quả</SortableTableHeader>
                     </tr>
                   </thead>
                   <tbody>
@@ -132,7 +154,7 @@ function ComplianceEmployeeTechniqueDetailPage() {
                         </td>
                       </tr>
                     ) : (
-                      data.items.map((item, idx) => (
+                      displayedItems.map((item, idx) => (
                         <Fragment key={item.formId || item.formName || idx}>
                           <tr
                             className={item.belowTarget ? 'evd-row--danger' : (!item.isPassed ? 'evd-row--warning' : '')}
@@ -180,15 +202,15 @@ function ComplianceEmployeeTechniqueDetailPage() {
                                   <table className="evd-detail-table admin-table-uppercase">
                                     <thead>
                                       <tr>
-                                        <th>Ngày ĐG</th>
+                                        <SortableTableHeader sortKey="evaluatedAt" sort={attemptSort} onSort={toggleAttemptSort}>Ngày ĐG</SortableTableHeader>
                                         <th>Người ĐG</th>
-                                        <th>Quy trình</th>
-                                        <th>Điểm</th>
-                                        <th>Kết quả</th>
+                                        <SortableTableHeader sortKey="formName" sort={attemptSort} onSort={toggleAttemptSort}>Quy trình</SortableTableHeader>
+                                        <SortableTableHeader sortKey="score" sort={attemptSort} onSort={toggleAttemptSort}>Điểm</SortableTableHeader>
+                                        <SortableTableHeader sortKey="passed" sort={attemptSort} onSort={toggleAttemptSort}>Kết quả</SortableTableHeader>
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {item.attempts.map((att, aIdx) => (
+                                      {sortTableRows(item.attempts, attemptSort, ATTEMPT_SORT_COLUMNS).map((att, aIdx) => (
                                         <tr key={aIdx}>
                                           <td>{formatDate(att.evaluatedAt)}</td>
                                           <td>{att.evaluatedBy || '—'}</td>

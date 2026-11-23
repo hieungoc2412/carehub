@@ -586,26 +586,10 @@ function Sidebar({ alertSummary = {} }) {
                         onClick={() => setIsMobileOpen(false)}
                       >
                         <span className="sidebar__item-icon">{item.icon}</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span className="sidebar__item-label">
                           <span>{item.label}</span>
                           {item.badge !== undefined && item.badge !== null && item.badge > 0 && (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: 20,
-                                height: 18,
-                                padding: '0 5px',
-                                fontSize: 11,
-                                fontWeight: 700,
-                                color: 'inherit',
-                                border: '1px solid #ef4444',
-                                borderRadius: 999,
-                                lineHeight: 1,
-                                textAlign: 'center',
-                              }}
-                            >
+                            <span className="sidebar__item-badge" aria-label={`${item.badge} bảng kiểm được giao`}>
                               {item.badge}
                             </span>
                           )}

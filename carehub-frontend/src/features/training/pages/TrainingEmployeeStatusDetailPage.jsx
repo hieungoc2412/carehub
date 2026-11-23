@@ -6,6 +6,8 @@ import KeyboardDatePicker from '../../../shared/components/KeyboardDatePicker.js
 import LoadingState from '../../../shared/components/LoadingState.jsx'
 import FilterActionButtons from '../../../shared/components/FilterActionButtons.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import { validateHistoricalDateRange } from '../../../shared/utils/dateRange.js'
 import {
   CalendarOutlined,
@@ -96,6 +98,7 @@ function TrainingEmployeeStatusDetailPage() {
   const [filterOptionsError, setFilterOptionsError] = useState('')
   const [filterDateError, setFilterDateError] = useState('')
   const pageSize = 10
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   useEffect(() => {
     setLoading(true)
@@ -224,7 +227,7 @@ function TrainingEmployeeStatusDetailPage() {
         : appliedFilters.hasEvidence === 'true',
       moderationStatus: appliedFilters.moderationStatus || undefined,
       sourceType: appliedFilters.sourceType || undefined,
-      sort: 'startDate,desc',
+      sort: apiSort(sort, 'startDate,desc'),
     })
       .then(response => {
         if (!active) return
@@ -264,7 +267,7 @@ function TrainingEmployeeStatusDetailPage() {
       })
 
     return () => { active = false }
-  }, [appliedFilters, employeeId, page])
+  }, [appliedFilters, employeeId, page, sort])
 
   const updateFilter = (key, value) => {
     setFilterDraft(current => ({ ...current, [key]: value }))
@@ -635,12 +638,12 @@ function TrainingEmployeeStatusDetailPage() {
                         <table className="ted-table admin-table-uppercase">
                           <thead>
                             <tr>
-                              <th>Khóa học / Đơn vị</th>
-                              <th>Phân loại</th>
-                              <th>Thời gian</th>
-                              <th>Số giờ</th>
+                              <SortableTableHeader label="Khóa học / Đơn vị" field="title" sort={sort} onSort={toggleSort} />
+                              <SortableTableHeader label="Phân loại" field="activityTypeName" sort={sort} onSort={toggleSort} />
+                              <SortableTableHeader label="Thời gian" field="startDate" sort={sort} onSort={toggleSort} />
+                              <SortableTableHeader label="Số giờ" field="declaredHours" sort={sort} onSort={toggleSort} />
                               <th>Minh chứng</th>
-                              <th>Trạng thái</th>
+                              <SortableTableHeader label="Trạng thái" field="workflowStatus" sort={sort} onSort={toggleSort} />
                               <th>Hành động</th>
                             </tr>
                           </thead>

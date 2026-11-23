@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { EyeOutlined, HistoryOutlined, ReloadOutlined } from '@ant-design/icons'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
@@ -42,6 +44,12 @@ function EvaluationAuditLogPage() {
   const [appliedFilters, setAppliedFilters] = useState({ q: '', action: '', entityType: '', actor: '' })
   const [isLoading, setIsLoading] = useState(true)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const { sort, toggleSort } = useTableSort()
+  const displayedLogs = useMemo(() => sortTableRows(logs, sort, {
+    createdAt: { getValue: log => log.createdAt, type: 'date' },
+    action: log => log.actionText || log.action,
+    entityType: log => log.entityType,
+  }), [logs, sort])
 
   const loadLogs = useCallback(async () => {
     setIsLoading(true)
@@ -134,16 +142,16 @@ function EvaluationAuditLogPage() {
                     <table className="eal-table admin-table-uppercase">
                       <thead>
                         <tr>
-                          <th>Thời gian</th>
-                          <th>Thao tác</th>
-                          <th>Đối tượng</th>
+                          <SortableTableHeader sortKey="createdAt" sort={sort} onSort={toggleSort}>Thời gian</SortableTableHeader>
+                          <SortableTableHeader sortKey="action" sort={sort} onSort={toggleSort}>Thao tác</SortableTableHeader>
+                          <SortableTableHeader sortKey="entityType" sort={sort} onSort={toggleSort}>Đối tượng</SortableTableHeader>
                           <th>Người thao tác</th>
                           <th>Mô tả</th>
                           <th>Hành động</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {logs.map((log) => (
+                        {displayedLogs.map((log) => (
                           <tr key={log.id} className={selectedLog?.id === log.id ? 'eal-row--active' : ''}>
                             <td>{formatDateTime(log.createdAt)}</td>
                             <td><span className="eal-badge">{log.actionText || log.action}</span></td>

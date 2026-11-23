@@ -13,6 +13,8 @@ import AppShell from '../../../shared/components/AppShell.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FilterActionButtons from '../../../shared/components/FilterActionButtons.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import { adminApi } from '../api/adminApi'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import '../styles/EmailTemplatesListPage.css'
@@ -39,6 +41,7 @@ function EmailTemplatesListPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(1))
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -56,7 +59,7 @@ function EmailTemplatesListPage() {
       adminApi.getEmailTemplates({
         page: page - 1,
         size: 10,
-        sort: 'updatedAt,desc',
+        sort: apiSort(sort, 'updatedAt,desc'),
         q: debouncedSearch || undefined,
         category: categoryFilter || undefined,
         active: statusFilter === '' ? undefined : statusFilter === 'ACTIVE',
@@ -82,7 +85,7 @@ function EmailTemplatesListPage() {
       window.clearTimeout(timer)
       activeRequest = false
     }
-  }, [page, debouncedSearch, categoryFilter, statusFilter, reloadToken])
+  }, [page, debouncedSearch, categoryFilter, statusFilter, reloadToken, sort])
 
   const executeDelete = async (id) => {
     try {
@@ -180,10 +183,10 @@ function EmailTemplatesListPage() {
                 <table className="etl-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th>Tên biểu mẫu</th>
-                      <th>Danh mục</th>
-                      <th>Điều kiện kích hoạt</th>
-                      <th>Trạng thái</th>
+                      <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên biểu mẫu</SortableTableHeader>
+                      <SortableTableHeader sortKey="category" sort={sort} onSort={toggleSort}>Danh mục</SortableTableHeader>
+                      <SortableTableHeader sortKey="eventType" sort={sort} onSort={toggleSort}>Điều kiện kích hoạt</SortableTableHeader>
+                      <SortableTableHeader sortKey="active" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                       <th>Hành động</th>
                     </tr>
                   </thead>

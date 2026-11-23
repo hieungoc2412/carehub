@@ -8,6 +8,8 @@ import { AUTH_ROLE, hasAnyRole } from '../../auth/utils/authNavigation.js'
 import { DownloadOutlined, EyeOutlined, LoadingOutlined } from '@ant-design/icons'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/TrainingEmployeeStatusListPage.css'
 
 const EXPORT_PAGE_SIZE = 100
@@ -144,6 +146,10 @@ function TrainingEmployeeStatusListPage() {
       ? 'COMPLIANT'
       : searchParams.get('compliant') === 'false' ? 'NON_COMPLIANT' : '',
   }))
+  const { sort, setSort, toggleSort } = useTableSort(
+    progressSort ? { key: 'progressPercentage', direction: progressSort } : null,
+    () => setPage(1),
+  )
 
   useEffect(() => {
     Promise.allSettled([
@@ -187,9 +193,7 @@ function TrainingEmployeeStatusListPage() {
         departmentId: appliedFilters.departmentId || undefined,
         jobPositionId: appliedFilters.jobPositionId || undefined,
         professionalFieldId: appliedFilters.professionalFieldId || undefined,
-        sort: appliedFilters.progressSort
-          ? `progressPercentage,${appliedFilters.progressSort}`
-          : undefined,
+        sort: apiSort(sort),
         ...getComplianceParams(appliedFilters.complianceStatus),
       }
       trainingApi.getEmployeeTrainingStatuses(params)
@@ -211,7 +215,7 @@ function TrainingEmployeeStatusListPage() {
       active = false
       window.clearTimeout(timer)
     }
-  }, [page, appliedFilters])
+  }, [page, appliedFilters, sort])
 
   const handleExport = async () => {
     setExporting(true)
@@ -222,9 +226,7 @@ function TrainingEmployeeStatusListPage() {
         departmentId: appliedFilters.departmentId || undefined,
         jobPositionId: appliedFilters.jobPositionId || undefined,
         professionalFieldId: appliedFilters.professionalFieldId || undefined,
-        sort: appliedFilters.progressSort
-          ? `progressPercentage,${appliedFilters.progressSort}`
-          : undefined,
+        sort: apiSort(sort),
         ...getComplianceParams(appliedFilters.complianceStatus),
       })
       downloadEmployeeTrainingCsv(rows.map(normalizeEmployee))
@@ -255,6 +257,7 @@ function TrainingEmployeeStatusListPage() {
 
   const applyFilters = () => {
     setPage(1)
+    setSort(progressSort ? { key: 'progressPercentage', direction: progressSort } : sort)
     setAppliedFilters({
       keyword: keyword.trim(),
       departmentId: isManager ? '' : departmentId,
@@ -272,6 +275,7 @@ function TrainingEmployeeStatusListPage() {
     setProfessionalFieldId('')
     setProgressSort('')
     setComplianceStatus('')
+    setSort(null)
     setPage(1)
     setAppliedFilters({
       keyword: '', departmentId: '', jobPositionId: '', professionalFieldId: '', progressSort: '', complianceStatus: '',
@@ -417,12 +421,12 @@ function TrainingEmployeeStatusListPage() {
                     <table className="tes-table admin-table-uppercase">
                       <thead>
                         <tr>
-                          <th className="tes-col-code">Mã NV</th>
+                          <SortableTableHeader className="tes-col-code" label="Mã NV" field="employeeCode" sort={sort} onSort={toggleSort} />
                           <th className="tes-col-name">Họ và tên</th>
-                          <th className="tes-col-position">Chức danh</th>
-                          <th className="tes-col-department">Khoa/Phòng</th>
-                          <th className="tes-col-progress">Tiến độ</th>
-                          <th className="tes-col-status">Trạng thái</th>
+                          <SortableTableHeader className="tes-col-position" label="Chức danh" field="jobPositionName" sort={sort} onSort={toggleSort} />
+                          <SortableTableHeader className="tes-col-department" label="Khoa/Phòng" field="departmentName" sort={sort} onSort={toggleSort} />
+                          <SortableTableHeader className="tes-col-progress" label="Tiến độ" field="progressPercentage" sort={sort} onSort={toggleSort} />
+                          <SortableTableHeader className="tes-col-status" label="Trạng thái" field="complianceStatus" sort={sort} onSort={toggleSort} />
                           <th className="tes-col-action">Hành động</th>
                         </tr>
                       </thead>

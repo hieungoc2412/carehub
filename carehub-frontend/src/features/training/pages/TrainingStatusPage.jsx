@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { trainingApi } from '../api/trainingApi.js'
 import { getApiErrorMessage } from '../../../shared/api/apiError.js'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import KeyboardDatePicker from '../../../shared/components/KeyboardDatePicker.jsx'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import '../styles/training.css'
 
 const TODAY = new Date().toISOString().slice(0, 10)
@@ -192,6 +194,12 @@ function StatusCard({ label, value, note }) {
 }
 
 function StatusTable({ rows, columns, labels }) {
+  const { sort, toggleSort } = useTableSort()
+  const sortColumns = useMemo(() => Object.fromEntries(columns.map(column => [column, {
+    getValue: row => row[column],
+    type: column === 'year' || column.toLowerCase().includes('hours') ? 'number' : 'text',
+  }])), [columns])
+  const displayedRows = useMemo(() => sortTableRows(rows, sort, sortColumns), [rows, sort, sortColumns])
   if (rows.length === 0) {
     return <div className="training-empty">Không có dữ liệu.</div>
   }
@@ -202,12 +210,12 @@ function StatusTable({ rows, columns, labels }) {
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column}>{labels?.[column] || column}</th>
+              <SortableTableHeader key={column} sortKey={column} sort={sort} onSort={toggleSort}>{labels?.[column] || column}</SortableTableHeader>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
+          {displayedRows.map((row, index) => (
             <tr key={`${row.year ?? row.activityTypeId ?? index}`}>
               {columns.map((column) => (
                 <td key={column}>{row[column] ?? '-'}</td>
@@ -221,6 +229,14 @@ function StatusTable({ rows, columns, labels }) {
 }
 
 function RecordTable({ rows }) {
+  const { sort, toggleSort } = useTableSort()
+  const displayedRows = useMemo(() => sortTableRows(rows, sort, {
+    title: record => record.title,
+    activityTypeName: record => record.activityTypeName,
+    startDate: { getValue: record => record.startDate, type: 'date' },
+    declaredHours: { getValue: record => record.declaredHours, type: 'number' },
+    workflowStatus: record => record.workflowStatus,
+  }), [rows, sort])
   if (rows.length === 0) {
     return <div className="training-empty">Không có record.</div>
   }
@@ -240,15 +256,15 @@ function RecordTable({ rows }) {
       <table className="training-table training-table--compact">
         <thead>
           <tr>
-            <th>Tiêu đề</th>
-            <th>Hoạt động</th>
-            <th>Ngày</th>
-            <th>Giờ khai báo</th>
-            <th>Trạng thái</th>
+            <SortableTableHeader sortKey="title" sort={sort} onSort={toggleSort}>Tiêu đề</SortableTableHeader>
+            <SortableTableHeader sortKey="activityTypeName" sort={sort} onSort={toggleSort}>Hoạt động</SortableTableHeader>
+            <SortableTableHeader sortKey="startDate" sort={sort} onSort={toggleSort}>Ngày</SortableTableHeader>
+            <SortableTableHeader sortKey="declaredHours" sort={sort} onSort={toggleSort}>Giờ khai báo</SortableTableHeader>
+            <SortableTableHeader sortKey="workflowStatus" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
           </tr>
         </thead>
         <tbody>
-          {rows.map((record) => (
+          {displayedRows.map((record) => (
             <tr key={record.id}>
               <td>{record.title}</td>
               <td>{record.activityTypeName}</td>

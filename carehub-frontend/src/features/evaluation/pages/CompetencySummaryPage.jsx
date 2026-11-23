@@ -4,8 +4,6 @@ import {
   ReloadOutlined,
   CheckCircleFilled,
   ExclamationCircleFilled,
-  CaretUpOutlined,
-  CaretDownOutlined,
   EyeOutlined,
   LeftOutlined,
   RightOutlined,
@@ -27,6 +25,8 @@ import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolba
 import KeyboardDatePicker from '../../../shared/components/KeyboardDatePicker.jsx'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { competencyApi } from '../api/examAssignmentApi.js'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { adminApi } from '../../admin/api/adminApi.js'
 import { staffApi } from '../../staff/api/staffApi.js'
 import { apiData, apiErrorMessage, formatNumber } from '../utils/documentQuestionUi.js'
@@ -40,6 +40,17 @@ import { EvaluationDashboardContent } from './EvaluationDashboardPage.jsx'
 import { downloadCsv, exportFileName } from '../../../shared/utils/tableExport.js'
 
 const PAGE_SIZE = 10
+const EXPORT_SORT_COLUMNS = {
+  employeeCode: item => item.employeeCode,
+  departmentName: item => item.departmentName,
+  examScore: { getValue: item => item.examScore ?? item.knowledgeAverage, type: 'number' },
+  skillAverage: { getValue: item => item.skillAverage, type: 'number' },
+  overallScore: { getValue: item => item.overallScore, type: 'number' },
+  evaluationCount: { getValue: item => item.evaluationCount, type: 'number' },
+  averageScore: { getValue: item => item.averageScore, type: 'number' },
+  passRate: { getValue: item => item.passRate, type: 'number' },
+  isPassed: { getValue: item => item.isPassed, type: 'boolean' },
+}
 const EXPORT_PAGE_SIZE = 100
 const defaultDateRange = currentYearDateRange()
 const today = defaultDateRange.toDate
@@ -115,9 +126,7 @@ function CompetencySummaryPage() {
     toDate: today,
   })
 
-  // Sorting
-  const [sortColumn, setSortColumn] = useState('overallScore')
-  const [sortDirection, setSortDirection] = useState('desc')
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   const effectiveDepartmentId = isAdmin ? appliedFilters.departmentId : departmentId
   const effectiveFromDate = appliedFilters.fromDate
@@ -180,6 +189,7 @@ function CompetencySummaryPage() {
           resultStatus: effectiveResultStatus || undefined,
           page,
           size: PAGE_SIZE,
+          sort: apiSort(sort),
         })
         const responseData = apiData(response, null)
         setData(responseData)
@@ -193,6 +203,7 @@ function CompetencySummaryPage() {
           resultStatus: effectiveResultStatus || undefined,
           page,
           size: PAGE_SIZE,
+          sort: apiSort(sort),
         })
         const responseData = apiData(response, null)
         setData(responseData)
@@ -205,7 +216,7 @@ function CompetencySummaryPage() {
     }
   }, [
     reportType, departmentId, effectiveDepartmentId, effectiveFromDate, effectiveToDate,
-    effectiveSelectedFormId, effectiveSearchTerm, effectiveResultStatus, page, isAdmin, showToast,
+    effectiveSelectedFormId, effectiveSearchTerm, effectiveResultStatus, page, isAdmin, showToast, sort,
   ])
 
   useEffect(() => {
@@ -216,22 +227,6 @@ function CompetencySummaryPage() {
     departmentId, reportType, effectiveFromDate, effectiveToDate,
     effectiveSelectedFormId, effectiveSearchTerm, effectiveResultStatus, page, isAdmin, loadData,
   ])
-
-  const handleSort = (column) => {
-    if (sortColumn === column) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortColumn(column)
-      setSortDirection('desc')
-    }
-  }
-
-  const sortIcon = (column) => {
-    if (sortColumn !== column) return <span style={{ marginLeft: 4, color: '#d1d5db' }}><CaretUpOutlined style={{ fontSize: 10 }} /></span>
-    return sortDirection === 'asc'
-      ? <CaretUpOutlined style={{ marginLeft: 4, fontSize: 10, color: '#2563eb' }} />
-      : <CaretDownOutlined style={{ marginLeft: 4, fontSize: 10, color: '#2563eb' }} />
-  }
 
   // Phân bố theo kết luận so với điểm sàn toàn viện, không còn xếp loại 5 mức.
   const buildDistribution = () => {
@@ -254,25 +249,6 @@ function CompetencySummaryPage() {
   const totalElements = Number(data?.totalElements) || 0
   const totalPages = Number(data?.totalPages) || 0
 
-  const getSortedSummaryItems = () => {
-    const items = [...filteredItems]
-    items.sort((a, b) => {
-      const aVal = sortColumn === 'examScore' ? (a.examScore ?? a.knowledgeAverage) : a[sortColumn]
-      const bVal = sortColumn === 'examScore' ? (b.examScore ?? b.knowledgeAverage) : b[sortColumn]
-      const aNum = typeof aVal === 'number' ? aVal : (parseFloat(aVal) || 0)
-      const bNum = typeof bVal === 'number' ? bVal : (parseFloat(bVal) || 0)
-      return sortDirection === 'asc' ? aNum - bNum : bNum - aNum
-    })
-    return items
-  }
-
-  const sortSummaryItems = (items) => [...items].sort((a, b) => {
-    const aValue = sortColumn === 'examScore' ? (a.examScore ?? a.knowledgeAverage) : a[sortColumn]
-    const bValue = sortColumn === 'examScore' ? (b.examScore ?? b.knowledgeAverage) : b[sortColumn]
-    const difference = (Number(aValue) || 0) - (Number(bValue) || 0)
-    return sortDirection === 'asc' ? difference : -difference
-  })
-
   async function handleExport() {
     setExporting(true)
     try {
@@ -292,7 +268,7 @@ function CompetencySummaryPage() {
         downloadCsv(
           exportFileName('nang-luc-chuyen-mon'),
           ['Mã NV', 'Họ tên', 'Khoa / Phòng', 'Điểm lý thuyết', 'Điểm thực hành', 'Tổng điểm', 'Kết quả', 'Từ ngày', 'Đến ngày'],
-          sortSummaryItems(items).map((item) => [
+          sortTableRows(items, sort, EXPORT_SORT_COLUMNS, item => item.employeeId).map((item) => [
             item.employeeCode,
             item.employeeName,
             item.departmentName,
@@ -604,19 +580,13 @@ function CompetencySummaryPage() {
                       <thead>
                         <tr>
                           <th>STT</th>
-                          <th>Mã NV</th>
+                          <SortableTableHeader sortKey="employeeCode" sort={sort} onSort={toggleSort}>Mã NV</SortableTableHeader>
                           <th>Họ tên</th>
-                          {isAdmin && <th>Khoa</th>}
-                          <th style={{ cursor: 'pointer' }} onClick={() => handleSort('examScore')}>
-                            Điểm kiểm tra{sortIcon('examScore')}
-                          </th>
-                          <th style={{ cursor: 'pointer' }} onClick={() => handleSort('skillAverage')}>
-                            Điểm thực hành{sortIcon('skillAverage')}
-                          </th>
-                          <th style={{ cursor: 'pointer' }} onClick={() => handleSort('overallScore')}>
-                            Tổng điểm{sortIcon('overallScore')}
-                          </th>
-                          <th>Kết quả</th>
+                          {isAdmin && <SortableTableHeader sortKey="departmentName" sort={sort} onSort={toggleSort}>Khoa</SortableTableHeader>}
+                          <SortableTableHeader sortKey="examScore" sort={sort} onSort={toggleSort}>Điểm kiểm tra</SortableTableHeader>
+                          <SortableTableHeader sortKey="skillAverage" sort={sort} onSort={toggleSort}>Điểm thực hành</SortableTableHeader>
+                          <SortableTableHeader sortKey="overallScore" sort={sort} onSort={toggleSort}>Tổng điểm</SortableTableHeader>
+                          <SortableTableHeader sortKey="isPassed" sort={sort} onSort={toggleSort}>Kết quả</SortableTableHeader>
                         </tr>
                       </thead>
                       <tbody>
@@ -633,7 +603,7 @@ function CompetencySummaryPage() {
                             </td>
                           </tr>
                         ) : (
-                          getSortedSummaryItems().map((item, idx) => {
+                          filteredItems.map((item, idx) => {
                             const rowClass = item.overallScore == null ? '' : (item.isPassed ? '' : 'evd-row--danger')
                             return (
                               <tr key={idx} className={rowClass}>
@@ -701,14 +671,14 @@ function CompetencySummaryPage() {
                       <thead>
                         <tr>
                           <th>STT</th>
-                          <th>Mã NV</th>
+                          <SortableTableHeader sortKey="employeeCode" sort={sort} onSort={toggleSort}>Mã NV</SortableTableHeader>
                           <th>Họ tên</th>
-                          {isAdmin && <th>Khoa/phòng</th>}
-                          <th>Số lượt</th>
-                          <th>Điểm trung bình</th>
-                          <th>Tỷ lệ đạt</th>
+                          {isAdmin && <SortableTableHeader sortKey="departmentName" sort={sort} onSort={toggleSort}>Khoa/phòng</SortableTableHeader>}
+                          <SortableTableHeader sortKey="evaluationCount" sort={sort} onSort={toggleSort}>Số lượt</SortableTableHeader>
+                          <SortableTableHeader sortKey="averageScore" sort={sort} onSort={toggleSort}>Điểm trung bình</SortableTableHeader>
+                          <SortableTableHeader sortKey="passRate" sort={sort} onSort={toggleSort}>Tỷ lệ đạt</SortableTableHeader>
                           <th>Mục tiêu</th>
-                          <th>Kết quả</th>
+                          <SortableTableHeader sortKey="isPassed" sort={sort} onSort={toggleSort}>Kết quả</SortableTableHeader>
                           <th>Hành động</th>
                         </tr>
                       </thead>

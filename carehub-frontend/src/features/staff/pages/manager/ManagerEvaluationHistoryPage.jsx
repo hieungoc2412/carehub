@@ -10,7 +10,9 @@ import AppShell from '../../../../shared/components/AppShell.jsx'
 import AppliedFilterToolbar from '../../../../shared/components/AppliedFilterToolbar.jsx'
 import KeyboardDatePicker from '../../../../shared/components/KeyboardDatePicker.jsx'
 import SearchableSelect from '../../../../shared/components/SearchableSelect.jsx'
+import SortableTableHeader from '../../../../shared/components/SortableTableHeader.jsx'
 import { validateHistoricalDateRange } from '../../../../shared/utils/dateRange.js'
+import { apiSort, nextTableSort } from '../../../../shared/utils/tableSort.js'
 import { adminApi } from '../../../admin/api/adminApi.js'
 import '../../../../shared/styles/admin-tables.css'
 import '../../../admin/styles/AdminQualityHistoryPage.css'
@@ -111,6 +113,11 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
   const result = searchParams.get('result') || ''
   const dateFrom = searchParams.get('dateFrom') || defaultDateRange.dateFrom
   const dateTo = searchParams.get('dateTo') || defaultDateRange.dateTo
+  const sortField = searchParams.get('sortField') || ''
+  const sortDirection = searchParams.get('sortDirection') || ''
+  const sort = useMemo(() => sortField && ['asc', 'desc'].includes(sortDirection)
+    ? { key: sortField, direction: sortDirection }
+    : null, [sortDirection, sortField])
 
   const [keywordInput, setKeywordInput] = useState(keyword)
   const [draftFormId, setDraftFormId] = useState(formId)
@@ -195,6 +202,7 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
         ...requestParams,
         page,
         size: pageSize,
+        sort: apiSort(sort),
       }),
       adminApi.getEvaluationHistorySummary(requestParams),
     ])
@@ -224,7 +232,16 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
         if (alive) setResultsLoading(false)
       })
     return () => { alive = false }
-  }, [page, pageSize, refreshKey, requestParams])
+  }, [page, pageSize, refreshKey, requestParams, sort])
+
+  const handleSort = (field) => {
+    const next = nextTableSort(sort, field)
+    updateQuery({
+      sortField: next?.key || '',
+      sortDirection: next?.direction || '',
+      page: 0,
+    }, false)
+  }
 
   const activeFilterCount = [
     formId,
@@ -443,11 +460,11 @@ function ManagerEvaluationHistoryPage({ historyPath = '/manager/quality/history'
                   <thead>
                     <tr>
                       <th className="aqh-result-col-employee">Nhân viên</th>
-                      <th className="aqh-result-col-department">Khoa/phòng</th>
-                      <th className="aqh-result-col-grader">Bảng kiểm</th>
-                      <th className="aqh-result-col-submitted">Ngày nộp</th>
-                      <th className="aqh-result-col-score">Điểm</th>
-                      <th className="aqh-result-col-result">Kết quả</th>
+                      <SortableTableHeader className="aqh-result-col-department" label="Khoa/phòng" field="departmentName" sort={sort} onSort={handleSort} />
+                      <SortableTableHeader className="aqh-result-col-grader" label="Bảng kiểm" field="formTitle" sort={sort} onSort={handleSort} />
+                      <SortableTableHeader className="aqh-result-col-submitted" label="Ngày nộp" field="submittedAt" sort={sort} onSort={handleSort} />
+                      <SortableTableHeader className="aqh-result-col-score" label="Điểm" field="convertedScore" sort={sort} onSort={handleSort} />
+                      <SortableTableHeader className="aqh-result-col-result" label="Kết quả" field="result" sort={sort} onSort={handleSort} />
                       <th className="aqh-result-col-actions">Hành động</th>
                     </tr>
                   </thead>

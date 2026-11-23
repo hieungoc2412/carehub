@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   CheckCircleOutlined,
@@ -12,12 +12,20 @@ import {
 import AppShell from '../../../shared/components/AppShell.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { adminApi } from '../api/adminApi.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import '../styles/ProfessionalFieldManagementPage.css'
 
 const EMPTY_FORM = { code: '', name: '', description: '', active: true, version: null }
 const EMPTY_FORM_ERRORS = { code: '', name: '' }
+const DEFAULT_FIELD_SORT = { key: 'createdAt', direction: 'desc' }
+const FIELD_SORT_COLUMNS = {
+  name: field => field.name,
+  createdAt: { getValue: field => field.createdAt, type: 'date' },
+  moderationStatus: field => moderationStatusOf(field),
+}
 
 function moderationStatusOf(field) {
   if (field?.moderationStatus) return field.moderationStatus
@@ -71,8 +79,14 @@ function ProfessionalFieldManagementPage() {
   const [saving, setSaving] = useState(false)
   const [rejectingField, setRejectingField] = useState(null)
   const [rejectSaving, setRejectSaving] = useState(false)
+  const { sort, toggleSort } = useTableSort()
 
   const activeTab = searchParams.get('tab') || 'existing'
+  const displaySort = sort ?? DEFAULT_FIELD_SORT
+  const displayedFields = useMemo(
+    () => sortTableRows(fields, displaySort, FIELD_SORT_COLUMNS),
+    [displaySort, fields],
+  )
 
   const handleTabChange = (tabName) => {
     setSearchParams({ tab: tabName })
@@ -89,6 +103,7 @@ function ProfessionalFieldManagementPage() {
       size: 100,
       keyword: appliedFilters.keyword || undefined,
       active: apiActive,
+      sort: apiSort(sort, 'createdAt,desc'),
     })
       .then(response => {
         let content = response.data?.data?.content || []
@@ -103,7 +118,7 @@ function ProfessionalFieldManagementPage() {
       })
       .catch(error => showToast(error?.response?.data?.message || 'Không thể tải lĩnh vực chuyên môn', 'error'))
       .finally(() => setLoading(false))
-  }, [activeTab, appliedFilters, showToast])
+  }, [activeTab, appliedFilters, showToast, sort])
 
   const loadPendingCount = useCallback(() => {
     adminApi.getProfessionalFields({
@@ -360,9 +375,15 @@ function ProfessionalFieldManagementPage() {
                     <col className="pfm-table__status" />
                     <col className="pfm-table__actions" />
                   </colgroup>
-                  <thead><tr><th scope="col">Tên lĩnh vực</th><th scope="col">Người đề xuất</th><th scope="col">Ngày đề xuất</th><th scope="col">Trạng thái</th><th scope="col">Hành động</th></tr></thead>
+                  <thead><tr>
+                    <SortableTableHeader sortKey="name" sort={displaySort} onSort={toggleSort}>Tên lĩnh vực</SortableTableHeader>
+                    <th scope="col">Người đề xuất</th>
+                    <SortableTableHeader sortKey="createdAt" sort={displaySort} onSort={toggleSort}>Ngày đề xuất</SortableTableHeader>
+                    <SortableTableHeader sortKey="moderationStatus" sort={displaySort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
+                    <th scope="col">Hành động</th>
+                  </tr></thead>
                   <tbody>
-                    {loading ? <tr><td colSpan={5}>Đang tải...</td></tr> : fields.length === 0 ? <tr><td colSpan={5}>Chưa có lĩnh vực phù hợp.</td></tr> : fields.map(field => (
+                    {loading ? <tr><td colSpan={5}>Đang tải...</td></tr> : displayedFields.length === 0 ? <tr><td colSpan={5}>Chưa có lĩnh vực phù hợp.</td></tr> : displayedFields.map(field => (
                       <tr key={field.id}>
                          <td>
                            <strong>{field.name}</strong>

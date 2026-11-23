@@ -27,6 +27,7 @@ import {
   toTrainingListApiParams,
 } from './utils/trainingRecordQuery.js'
 import { formatLocalDate, validateHistoricalDateRange } from '../../../../shared/utils/dateRange.js'
+import { nextTableSort } from '../../../../shared/utils/tableSort.js'
 import '../../../training/styles/TrainingHours.css'
 
 const STATUS_FILTER_OPTIONS = [
@@ -41,6 +42,9 @@ function TrainingHoursListScreen() {
   const [urlSearchParams, setUrlSearchParams] = useSearchParams()
   const urlQuery = urlSearchParams.toString()
   const queryFilters = useMemo(() => parseTrainingQuery(urlQuery), [urlQuery])
+  const tableSort = queryFilters.sortField && queryFilters.sortDirection
+    ? { key: queryFilters.sortField, direction: queryFilters.sortDirection }
+    : null
   const { showToast } = useToast()
   const [search, setSearch] = useState('')
   const [isSearchExpanded, setIsSearchExpanded] = useState(false)
@@ -527,6 +531,16 @@ function TrainingHoursListScreen() {
                   <TrainingRecordTable
                     records={records}
                     columns={['date', 'title', 'hours', 'submitted', 'actions']}
+                  sort={tableSort}
+                  onSort={(key) => {
+                    const next = nextTableSort(tableSort, key)
+                    setUrlSearchParams(serializeTrainingQuery({
+                      ...queryFilters,
+                      page: 1,
+                      sortField: next?.key || '',
+                      sortDirection: next?.direction || '',
+                    }))
+                  }}
                     onBodyScroll={handleMobileRecordsScroll}
                     onRowClick={record => navigate(`/staff/training/${record.id}`)}
                     actions={['view', 'edit', 'delete']}

@@ -7,6 +7,8 @@ import DepartmentCombobox from '../../../shared/components/DepartmentCombobox.js
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
 import AppliedFilterToolbar from '../../../shared/components/AppliedFilterToolbar.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, useTableSort } from '../../../shared/utils/tableSort.js'
 import { adminApi } from '../api/adminApi'
 import {
   EyeOutlined,
@@ -56,6 +58,7 @@ function AdminAccountsScreen() {
   const [totalElements, setTotalElements] = useState(0)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(1))
 
   const getVisiblePages = () => {
     const pages = []
@@ -236,6 +239,7 @@ function AdminAccountsScreen() {
       roleId: appliedFilters.roleId !== 'all' ? appliedFilters.roleId : undefined,
       status: appliedFilters.status !== 'all' ? appliedFilters.status : undefined,
       deleted: appliedFilters.deleted === 'deleted' ? true : undefined,
+      sort: apiSort(sort, 'id,desc'),
     }
 
     adminApi.getUsers(params)
@@ -258,7 +262,7 @@ function AdminAccountsScreen() {
 
     loadUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, appliedFilters])
+  }, [page, appliedFilters, sort])
 
   useEffect(() => {
     const nextSearch = search.trim()
@@ -830,11 +834,11 @@ function AdminAccountsScreen() {
                 <table className="am-table admin-table-uppercase">
                   <thead>
                     <tr>
-                      <th>ID</th>
+                      <SortableTableHeader sortKey="id" sort={sort} onSort={toggleSort}>ID</SortableTableHeader>
                       <th>Họ và tên</th>
-                      <th>Phòng ban</th>
-                      <th>Vai trò</th>
-                      <th>Trạng thái</th>
+                      <SortableTableHeader sortKey="department" sort={sort} onSort={toggleSort}>Phòng ban</SortableTableHeader>
+                      <SortableTableHeader sortKey="role" sort={sort} onSort={toggleSort}>Vai trò</SortableTableHeader>
+                      <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                       <th>Hành động</th>
                     </tr>
                   </thead>

@@ -15,6 +15,8 @@ import {
 import AppShell from '../../../shared/components/AppShell.jsx'
 import ConfirmDialog from '../../../shared/components/ConfirmDialog.jsx'
 import FormSelectField from '../../../shared/components/FormSelectField.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { documentQuestionApi } from '../api/documentQuestionApi.js'
 import { questionCategoryApi } from '../api/questionCategoryApi.js'
@@ -60,13 +62,23 @@ function QuestionDocumentListPage() {
   const [categoryForm, setCategoryForm] = useState({ name: '', code: '', description: '' })
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [isDeletingDocument, setIsDeletingDocument] = useState(false)
+  const { sort, toggleSort } = useTableSort(null, () => setPage(0))
 
   const loadDocuments = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await documentQuestionApi.listDocuments({ page: 0, size: 100, sort: 'createdAt,desc' })
       const data = apiData(response, { content: [] })
-      setDocuments(data.content || [])
+      const totalPages = Number(data.totalPages) || 1
+      const remaining = totalPages > 1
+        ? await Promise.all(Array.from({ length: totalPages - 1 }, (_, index) => (
+            documentQuestionApi.listDocuments({ page: index + 1, size: 100, sort: 'createdAt,desc' })
+          )))
+        : []
+      setDocuments([
+        ...(data.content || []),
+        ...remaining.flatMap(item => apiData(item, { content: [] }).content || []),
+      ])
     } catch (error) {
       showToast(apiErrorMessage(error), 'error')
     } finally {
@@ -81,8 +93,15 @@ function QuestionDocumentListPage() {
     })
   }, [documents, keyword])
 
-  const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE))
-  const displayRows = filteredDocuments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const sortedDocuments = useMemo(() => sortTableRows(filteredDocuments, sort, {
+    filename: document => document.filename,
+    status: document => document.status,
+    pageCount: { getValue: document => document.pageCount, type: 'number' },
+    candidateCount: { getValue: document => document.latestQuestionJob?.candidateCount, type: 'number' },
+    createdAt: { getValue: document => document.createdAt, type: 'date' },
+  }), [filteredDocuments, sort])
+  const totalPages = Math.max(1, Math.ceil(sortedDocuments.length / PAGE_SIZE))
+  const displayRows = sortedDocuments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   useEffect(() => {
 
@@ -308,11 +327,11 @@ function QuestionDocumentListPage() {
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Tên tài liệu</th>
-                      <th>Trạng thái</th>
-                      <th>Số trang</th>
-                      <th>Câu hỏi đã tạo</th>
-                      <th>Ngày tải</th>
+                      <SortableTableHeader sortKey="filename" sort={sort} onSort={toggleSort}>Tên tài liệu</SortableTableHeader>
+                      <SortableTableHeader sortKey="status" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
+                      <SortableTableHeader sortKey="pageCount" sort={sort} onSort={toggleSort}>Số trang</SortableTableHeader>
+                      <SortableTableHeader sortKey="candidateCount" sort={sort} onSort={toggleSort}>Câu hỏi đã tạo</SortableTableHeader>
+                      <SortableTableHeader sortKey="createdAt" sort={sort} onSort={toggleSort}>Ngày tải</SortableTableHeader>
                       <th>Hành động</th>
                     </tr>
                   </thead>

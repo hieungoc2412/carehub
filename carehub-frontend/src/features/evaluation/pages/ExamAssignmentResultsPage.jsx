@@ -12,6 +12,8 @@ import {
   SearchOutlined,
 } from '@ant-design/icons'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { apiSort, sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import { useToast } from '../../../shared/context/ToastContext.jsx'
 import { examAssignmentApi } from '../api/examAssignmentApi.js'
 import { apiData, apiErrorMessage, formatDateTime, formatNumber } from '../utils/documentQuestionUi.js'
@@ -65,6 +67,7 @@ export default function ExamAssignmentResultsPage() {
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [selectedResult, setSelectedResult] = useState('all')
   const [selectedViolation, setSelectedViolation] = useState('all')
+  const { sort, toggleSort } = useTableSort()
 
   const loadData = useCallback(async () => {
     setIsLoading(true)
@@ -126,7 +129,7 @@ export default function ExamAssignmentResultsPage() {
 
   // Filtered rows
   const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       // 1. Search Query
       if (searchQuery.trim()) {
         const query = searchQuery.trim().toLowerCase()
@@ -162,7 +165,16 @@ export default function ExamAssignmentResultsPage() {
 
       return true
     })
-  }, [rows, searchQuery, selectedDepartment, selectedResult, selectedViolation])
+    return sortTableRows(filtered, sort, {
+      departmentName: row => row.departmentName,
+      attemptCount: { getValue: row => row.attemptCount, type: 'number' },
+      bestScore: { getValue: row => row.bestScore, type: 'number' },
+      latestScore: { getValue: row => row.latestScore, type: 'number' },
+      latestTabSwitchCount: { getValue: row => row.latestTabSwitchCount, type: 'number' },
+      bestPassed: { getValue: row => row.bestPassed, type: 'boolean' },
+      latestSubmittedAt: { getValue: row => row.latestSubmittedAt || row.latestStartedAt, type: 'date' },
+    }, row => row.userId)
+  }, [rows, searchQuery, selectedDepartment, selectedResult, selectedViolation, sort])
 
   async function exportResults() {
     setIsExporting(true)
@@ -173,6 +185,7 @@ export default function ExamAssignmentResultsPage() {
       if (selectedResult !== 'all') params.status = selectedResult
       if (selectedViolation === 'has_violation') params.violation = true
       if (selectedViolation === 'clean') params.violation = false
+      params.sort = apiSort(sort)
 
       const response = await examAssignmentApi.exportAssignmentResults(assignmentId, params)
       const blob = response.data instanceof Blob ? response.data : new Blob([response.data])
@@ -393,13 +406,13 @@ export default function ExamAssignmentResultsPage() {
                   <thead>
                     <tr>
                       <th>Nhân viên</th>
-                      <th>Khoa/phòng</th>
-                      <th>Lượt làm</th>
-                      <th>Điểm cao nhất <small>/10</small></th>
-                      <th>Điểm mới nhất <small>/10</small></th>
-                      <th>Giám sát</th>
-                      <th>Đánh giá</th>
-                      <th>Lượt mới nhất</th>
+                      <SortableTableHeader label="Khoa/phòng" field="departmentName" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Lượt làm" field="attemptCount" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Điểm cao nhất /10" field="bestScore" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Điểm mới nhất /10" field="latestScore" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Giám sát" field="latestTabSwitchCount" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Đánh giá" field="bestPassed" sort={sort} onSort={toggleSort} />
+                      <SortableTableHeader label="Lượt mới nhất" field="latestSubmittedAt" sort={sort} onSort={toggleSort} />
                       <th>Hành động</th>
                     </tr>
                   </thead>

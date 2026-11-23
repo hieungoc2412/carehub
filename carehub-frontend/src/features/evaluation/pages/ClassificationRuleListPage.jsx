@@ -2,6 +2,8 @@ import { matchesSearch } from '../../../shared/utils/searchText.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../../../shared/components/AppShell.jsx'
+import SortableTableHeader from '../../../shared/components/SortableTableHeader.jsx'
+import { sortTableRows, useTableSort } from '../../../shared/utils/tableSort.js'
 import AdminFilterDisclosure from '../../../shared/components/AdminFilterDisclosure.jsx'
 import ConfirmModal from '../../../shared/components/ConfirmModal.jsx'
 import FilterSelectField from '../../../shared/components/FilterSelectField.jsx'
@@ -20,6 +22,7 @@ function ClassificationRuleListPage() {
   const [keyword, setKeyword] = useState('')
   const [enabledFilter, setEnabledFilter] = useState('')
   const [pendingDisable, setPendingDisable] = useState(null)
+  const { sort, toggleSort } = useTableSort()
 
   const loadRules = useCallback(async () => {
     setIsLoading(true)
@@ -52,6 +55,13 @@ function ClassificationRuleListPage() {
       return matchesKeyword && matchesStatus
     })
   }, [enabledFilter, keyword, rules])
+  const displayedRules = useMemo(() => sortTableRows(filteredRules, sort, {
+    name: item => item.name,
+    categoryName: item => item.categoryName,
+    sourcePattern: item => item.sourcePattern,
+    priority: { getValue: item => item.priority, type: 'number' },
+    enabled: { getValue: item => item.enabled, type: 'boolean' },
+  }), [filteredRules, sort])
 
   const handleDelete = (item) => {
     setPendingDisable(item)
@@ -146,12 +156,12 @@ function ClassificationRuleListPage() {
             </colgroup>
             <thead>
               <tr>
-                <th>Tên quy tắc</th>
-                <th>Danh mục</th>
+                <SortableTableHeader sortKey="name" sort={sort} onSort={toggleSort}>Tên quy tắc</SortableTableHeader>
+                <SortableTableHeader sortKey="categoryName" sort={sort} onSort={toggleSort}>Danh mục</SortableTableHeader>
                 <th>Từ khóa</th>
-                <th>Nguồn</th>
-                <th>Ưu tiên</th>
-                <th>Trạng thái</th>
+                <SortableTableHeader sortKey="sourcePattern" sort={sort} onSort={toggleSort}>Nguồn</SortableTableHeader>
+                <SortableTableHeader sortKey="priority" sort={sort} onSort={toggleSort}>Ưu tiên</SortableTableHeader>
+                <SortableTableHeader sortKey="enabled" sort={sort} onSort={toggleSort}>Trạng thái</SortableTableHeader>
                 <th className="crl-th-actions">Hành động</th>
               </tr>
             </thead>
@@ -162,14 +172,14 @@ function ClassificationRuleListPage() {
                     Đang tải quy tắc phân loại...
                   </td>
                 </tr>
-              ) : filteredRules.length === 0 ? (
+              ) : displayedRules.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="ch-empty">
                     Chưa có quy tắc phân loại nào được tạo.
                   </td>
                 </tr>
               ) : (
-                filteredRules.map((item) => (
+                displayedRules.map((item) => (
                   <tr key={item.id}>
                     <td>
                       <strong className="crl-rule-name">

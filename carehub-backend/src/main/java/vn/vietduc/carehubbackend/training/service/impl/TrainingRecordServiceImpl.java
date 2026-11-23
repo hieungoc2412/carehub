@@ -446,6 +446,7 @@ public class TrainingRecordServiceImpl implements TrainingRecordService {
         Map<String, String> allowedSorts = Map.ofEntries(
                 Map.entry("id", "id"),
                 Map.entry("title", "title"),
+                Map.entry("activityTypeName", "activityType.name"),
                 Map.entry("startDate", "startDate"),
                 Map.entry("submittedAt", "submittedAt"),
                 Map.entry("updatedAt", "updatedAt"),

@@ -1,5 +1,6 @@
 const VALID_STATUS_VALUES = new Set(['SUBMITTED', 'DRAFT', 'CANCELLED'])
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const VALID_SORT_FIELDS = new Set(['startDate', 'title', 'declaredHours', 'submittedAt'])
 
 function isValidIsoDate(value) {
   if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false
@@ -38,6 +39,8 @@ function createEmptyTrainingFilters() {
     dateTo: dateRange.toDate,
     professionalFieldId: '',
     activityTypeId: '',
+    sortField: '',
+    sortDirection: '',
     page: 1,
   }
 }
@@ -55,6 +58,8 @@ function parseTrainingQuery(search = '') {
     dateTo: normalizeDate(params.get('dateTo')) || dateRange.toDate,
     professionalFieldId: normalizePositiveInteger(params.get('professionalFieldId')),
     activityTypeId: normalizePositiveInteger(params.get('activityTypeId')),
+    sortField: VALID_SORT_FIELDS.has(params.get('sortField')) ? params.get('sortField') : '',
+    sortDirection: ['asc', 'desc'].includes(params.get('sortDirection')) ? params.get('sortDirection') : '',
     page,
   }
 }
@@ -68,6 +73,8 @@ function serializeTrainingQuery(filters = {}) {
   const professionalFieldId = normalizePositiveInteger(filters.professionalFieldId)
   const activityTypeId = normalizePositiveInteger(filters.activityTypeId)
   const page = Number(filters.page)
+  const sortField = VALID_SORT_FIELDS.has(filters.sortField) ? filters.sortField : ''
+  const sortDirection = ['asc', 'desc'].includes(filters.sortDirection) ? filters.sortDirection : ''
 
   if (q) params.set('q', q)
   if (status) params.set('status', status)
@@ -75,6 +82,10 @@ function serializeTrainingQuery(filters = {}) {
   if (dateTo) params.set('dateTo', dateTo)
   if (professionalFieldId) params.set('professionalFieldId', professionalFieldId)
   if (activityTypeId) params.set('activityTypeId', activityTypeId)
+  if (sortField && sortDirection) {
+    params.set('sortField', sortField)
+    params.set('sortDirection', sortDirection)
+  }
   if (Number.isSafeInteger(page) && page > 1) params.set('page', String(page))
 
   return params
@@ -96,6 +107,9 @@ function toTrainingListApiParams(filters = {}, employeeId, size = 10) {
     dateTo: parsed.dateTo || undefined,
     professionalFieldId: parsed.professionalFieldId ? Number(parsed.professionalFieldId) : undefined,
     activityTypeId: parsed.activityTypeId ? Number(parsed.activityTypeId) : undefined,
+    ...(parsed.sortField && parsed.sortDirection
+      ? { sort: `${parsed.sortField},${parsed.sortDirection}` }
+      : {}),
     ...(employeeId != null ? { employeeId } : {}),
   }
 }
