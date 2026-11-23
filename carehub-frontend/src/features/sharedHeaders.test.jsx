@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const headerMocks = vi.hoisted(() => ({
@@ -82,6 +82,55 @@ const notificationSamples = [
   { id: 4, type: 'UNKNOWN', message: 'Thông tin', sender: 'Hệ thống', createdAt: '08:03', read: false },
 ]
 
+function NotificationLocation() {
+  const location = useLocation()
+  return <output data-testid="notification-location">{location.pathname}{location.search}</output>
+}
+
+describe('notification navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    headerMocks.profileError = null
+    headerMocks.pendingExamCount = 0
+    headerMocks.hasChecklistAssignment = false
+    headerMocks.markAsRead.mockReset()
+  })
+
+  it.each([
+    ['ADMIN', '/admin/training/professional-fields?tab=pending', AdminHeader],
+    ['USER', '/staff/checklists', Header],
+    ['USER', '/staff/exam/take', Header],
+    ['MANAGER', '/manager/quality/checklists', Header],
+  ])('%s opens the notification destination %s', (role, deepLink, Component) => {
+    headerMocks.roles = [role]
+    headerMocks.profileData = { fullName: 'Người dùng', roles: [role] }
+    headerMocks.notifications = [{ ...notificationSamples[0], message: 'Thông báo được giao', deepLink }]
+    headerMocks.unreadCount = 1
+    render(<MemoryRouter initialEntries={['/start']}><Component /><NotificationLocation /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^Mở thông báo,/ }))
+
+    fireEvent.click(screen.getByText('Thông báo được giao'))
+
+    expect(screen.getByTestId('notification-location')).toHaveTextContent(deepLink)
+    expect(headerMocks.markAsRead).toHaveBeenCalledWith(1)
+    expect(screen.queryByText('Thông báo được giao')).not.toBeInTheDocument()
+  })
+
+  it.each([false, true])('opens a notification with read=%s without waiting for a read request', (read) => {
+    headerMocks.roles = ['USER']
+    headerMocks.profileData = { fullName: 'Nhân viên', roles: ['USER'] }
+    headerMocks.notifications = [{ ...notificationSamples[0], message: 'Bài kiểm tra được giao', read, deepLink: '/staff/exam/take' }]
+    headerMocks.unreadCount = read ? 0 : 1
+    headerMocks.markAsRead.mockReturnValueOnce(new Promise(() => {}))
+    render(<MemoryRouter><Header /><NotificationLocation /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^Mở thông báo,/ }))
+
+    fireEvent.click(screen.getByText('Bài kiểm tra được giao'))
+
+    expect(screen.getByTestId('notification-location')).toHaveTextContent('/staff/exam/take')
+  })
+})
+
 describe('staff Header', () => {
   beforeEach(() => {
     headerMocks.roles = ['USER']
@@ -163,7 +212,7 @@ describe('staff Header', () => {
     headerMocks.unreadCount = 4
     renderHeader(Header)
 
-    const toggle = screen.getByRole('button', { name: 'Mở thông báo' })
+    const toggle = screen.getByRole('button', { name: 'Mở thông báo, 4 thông báo chưa đọc' })
     fireEvent.click(toggle)
 
     const popover = screen.getByText('Thông báo').closest('.notify-popover')
@@ -184,7 +233,7 @@ describe('staff Header', () => {
 
   it('shows an empty notification state and disables mark-all', () => {
     renderHeader(Header)
-    fireEvent.click(screen.getByRole('button', { name: 'Mở thông báo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mở thông báo, không có thông báo chưa đọc' }))
 
     expect(screen.getByText('Không có thông báo mới nào')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Đọc tất cả' })).toBeDisabled()
@@ -296,7 +345,7 @@ describe('AdminHeader', () => {
     renderHeader(AdminHeader)
 
     expect(screen.getByRole('link', { name: '105 bài kiểm tra chưa làm' })).toHaveTextContent('99+')
-    const toggle = screen.getByRole('button', { name: 'Thông báo, 4 chưa đọc' })
+    const toggle = screen.getByRole('button', { name: 'Mở thông báo, 4 thông báo chưa đọc' })
     fireEvent.click(toggle)
 
     const popover = screen.getByText('Thông báo').closest('.notify-popover')
@@ -327,7 +376,7 @@ describe('AdminHeader', () => {
     })
 
     expect(screen.getByTestId('account-dropdown')).toHaveTextContent('A||Quản lý cấp Bệnh Viện|/admin/profile')
-    fireEvent.click(screen.getByRole('button', { name: 'Thông báo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mở thông báo, không có thông báo chưa đọc' }))
     expect(screen.getByText('Không có thông báo mới nào')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Mở tìm kiếm và bộ lọc, 1 điều kiện đang chọn' }))
     expect(onToggle).toHaveBeenCalled()
@@ -343,5 +392,68 @@ describe('AdminHeader', () => {
       'Error loading admin header profile',
       headerMocks.profileError,
     ))
+  })
+})
+
+describe.each([
+  ['staff', Header, 'USER'],
+  ['manager', Header, 'MANAGER'],
+  ['admin', AdminHeader, 'ADMIN'],
+])('%s notification bell', (_label, Component, role) => {
+  beforeEach(() => {
+    headerMocks.roles = [role]
+    headerMocks.profileData = { fullName: 'Người dùng', roles: [role] }
+    headerMocks.profileError = null
+    headerMocks.notifications = []
+    headerMocks.pendingExamCount = 0
+    headerMocks.hasChecklistAssignment = false
+  })
+
+  it.each([[0, null], [1, '1'], [12, '12'], [99, '99'], [100, '99+'], [125, '99+'], [10000, '99+']])('formats unread count %i on the badge and keeps the exact accessible count', (count, label) => {
+    headerMocks.unreadCount = count
+    renderHeader(Component)
+
+    const button = screen.getByRole('button', {
+      name: `Mở thông báo, ${count > 0 ? `${count} thông báo chưa đọc` : 'không có thông báo chưa đọc'}`,
+    })
+    const badge = button.querySelector('.dashboard-header__notify-badge')
+    const icon = button.querySelector('.dashboard-header__notify-icon')
+
+    if (count > 0) {
+      expect(badge.textContent).toBe(label)
+      expect(badge).toHaveAttribute('aria-hidden', 'true')
+      expect(icon).toHaveClass('dashboard-header__notify-icon--ringing')
+    } else {
+      expect(badge).not.toBeInTheDocument()
+      expect(icon).not.toHaveClass('dashboard-header__notify-icon--ringing')
+    }
+
+    fireEvent.click(button)
+    expect(screen.getByText('Thông báo').closest('.notify-popover'))
+      .toHaveTextContent(`Bạn có ${count} thông báo chưa đọc`)
+    expect(screen.queryByText(/hôm nay/)).not.toBeInTheDocument()
+  })
+
+  it('updates the badge and ringing after reads, new notifications and a rollback', () => {
+    headerMocks.unreadCount = 3
+    const view = renderHeader(Component)
+
+    for (const [count, label] of [[100, '99+'], [99, '99'], [2, '2'], [0, null], [125, '99+'], [0, null], [125, '99+']]) {
+      headerMocks.unreadCount = count
+      view.rerender(<MemoryRouter><Component /></MemoryRouter>)
+
+      const button = screen.getByRole('button', {
+        name: `Mở thông báo, ${count > 0 ? `${count} thông báo chưa đọc` : 'không có thông báo chưa đọc'}`,
+      })
+      const icon = button.querySelector('.dashboard-header__notify-icon')
+      const badge = button.querySelector('.dashboard-header__notify-badge')
+      if (count > 0) {
+        expect(badge.textContent).toBe(label)
+        expect(icon).toHaveClass('dashboard-header__notify-icon--ringing')
+      } else {
+        expect(badge).not.toBeInTheDocument()
+        expect(icon).not.toHaveClass('dashboard-header__notify-icon--ringing')
+      }
+    }
   })
 })

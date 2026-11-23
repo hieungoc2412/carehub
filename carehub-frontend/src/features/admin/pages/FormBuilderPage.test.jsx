@@ -56,6 +56,17 @@ const renderPage = async () => {
 }
 
 describe('FormBuilderPage', () => {
+  it('adds the five standard checklist answers with their existing scores', async () => {
+    await renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /Thêm câu hỏi mới/ }))
+    const newQuestion = screen.getByDisplayValue('Câu hỏi mới').closest('.fbp-item-box')
+
+    expect(within(newQuestion).getAllByRole('textbox', { name: /^Nhãn lựa chọn \d+$/ }).map((input) => input.value))
+      .toEqual(['Không thực hiện', 'Thực hiện nhưng không đạt', 'Đạt', 'Tốt', 'Rất tốt'])
+    expect([...newQuestion.querySelectorAll('.fbp-option-score-input')].map((input) => Number(input.value)))
+      .toEqual([-1, 0, 1, 1.2, 1.5])
+  })
+
   it('edits all item kinds, scoring, options, sections and protects dirty navigation', async () => {
     await renderPage()
     expect(screen.getByText('1 phần')).toBeInTheDocument()

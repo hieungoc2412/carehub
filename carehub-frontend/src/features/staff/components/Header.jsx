@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BellOutlined,
   WarningOutlined,
@@ -87,6 +87,7 @@ function Header({
   mobileSearch,
   onAlertSummaryChange,
 }) {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
 
   const accessToken = tokenStorage.getAccessToken()
@@ -178,7 +179,13 @@ function Header({
             type="button"
             key={item.id}
             className={`notify-item${item.read ? '' : ' notify-item--unread'}`}
-            onClick={() => markAsRead(item.id)}
+            onClick={() => {
+              markAsRead(item.id)
+              if (item.deepLink) {
+                setShowNotifications(false)
+                navigate(item.deepLink)
+              }
+            }}
           >
             <div className={`notify-item__icon-wrapper notify-item__icon-wrapper--${getNotificationTone(item.type)}`}>
               {getIcon(item.type)}
@@ -275,11 +282,16 @@ function Header({
             ref={notifyRef}
             className="dashboard-header__notify"
             onClick={() => setShowNotifications(prev => !prev)}
-            aria-label="Mở thông báo"
+            aria-label={`Mở thông báo, ${unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'không có thông báo chưa đọc'}`}
             aria-expanded={showNotifications}
           >
-            <BellOutlined />
-            {unreadCount > 0 && <span className="dashboard-header__notify-dot"></span>}
+            <BellOutlined
+              className={`dashboard-header__notify-icon${unreadCount > 0 ? ' dashboard-header__notify-icon--ringing' : ''}`}
+              aria-hidden="true"
+            />
+            {unreadCount > 0 && (
+              <span className="dashboard-header__notify-badge" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>
+            )}
           </button>
 
           {showNotifications && (
@@ -288,7 +300,7 @@ function Header({
                 <div className="notify-popover__title-area">
                   <h3 className="notify-popover__title">Thông báo</h3>
                   <p className="notify-popover__subtitle">
-                    Bạn có <span>{unreadCount} thông báo</span> hôm nay
+                    Bạn có <span>{unreadCount} thông báo chưa đọc</span>
                   </p>
                 </div>
                 <button

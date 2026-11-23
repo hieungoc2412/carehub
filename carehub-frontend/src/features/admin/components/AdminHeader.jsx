@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BellOutlined,
   WarningOutlined,
@@ -82,6 +82,7 @@ function getDisplayRole(profileRoles, tokenRoles, fallbackRole) {
 }
 
 function AdminHeader({ title = 'Trang chủ', userName = '', roleName = '', breadcrumbs, back, mobileSearch }) {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
 
   const accessToken = tokenStorage.getAccessToken()
@@ -166,7 +167,13 @@ function AdminHeader({ title = 'Trang chủ', userName = '', roleName = '', brea
             type="button"
             key={item.id}
             className={`notify-item${item.read ? '' : ' notify-item--unread'}`}
-            onClick={() => markAsRead(item.id)}
+            onClick={() => {
+              markAsRead(item.id)
+              if (item.deepLink) {
+                setShowNotifications(false)
+                navigate(item.deepLink)
+              }
+            }}
           >
             <div className={`notify-item__icon-wrapper notify-item__icon-wrapper--${getNotificationTone(item.type)}`}>
               {getIcon(item.type)}
@@ -258,12 +265,17 @@ function AdminHeader({ title = 'Trang chủ', userName = '', roleName = '', brea
             type="button"
             ref={notifyRef}
             className="dashboard-header__notify"
-            aria-label={`Thông báo${unreadCount > 0 ? `, ${unreadCount} chưa đọc` : ''}`}
+            aria-label={`Mở thông báo, ${unreadCount > 0 ? `${unreadCount} thông báo chưa đọc` : 'không có thông báo chưa đọc'}`}
             aria-expanded={showNotifications}
             onClick={() => setShowNotifications(prev => !prev)}
           >
-            <BellOutlined />
-            {unreadCount > 0 && <span className="dashboard-header__notify-dot"></span>}
+            <BellOutlined
+              className={`dashboard-header__notify-icon${unreadCount > 0 ? ' dashboard-header__notify-icon--ringing' : ''}`}
+              aria-hidden="true"
+            />
+            {unreadCount > 0 && (
+              <span className="dashboard-header__notify-badge" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>
+            )}
           </button>
 
           {showNotifications && (
@@ -272,7 +284,7 @@ function AdminHeader({ title = 'Trang chủ', userName = '', roleName = '', brea
                 <div className="notify-popover__title-area">
                   <h3 className="notify-popover__title">Thông báo</h3>
                   <p className="notify-popover__subtitle">
-                    Bạn có <span>{unreadCount} thông báo</span> hôm nay
+                    Bạn có <span>{unreadCount} thông báo chưa đọc</span>
                   </p>
                 </div>
                 <button

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   SearchOutlined,
   DeleteOutlined,
@@ -21,6 +21,7 @@ import { publishNotificationStateChange } from '../hooks/useNotifications.js'
 import '../styles/NotificationsStaffScreen.css'
 
 function NotificationsStaffScreen() {
+  const navigate = useNavigate()
   const { showToast } = useToast()
 
   const breadcrumbs = [
@@ -94,6 +95,11 @@ function NotificationsStaffScreen() {
 
   // Tải chi tiết một thông báo (gắn API GET /api/v1/me/notifications/{id})
   const handleOpenDetail = async (notif) => {
+    if (notif.deepLink) {
+      if (!notif.read) handleMarkAsRead(notif.id, true)
+      navigate(notif.deepLink)
+      return
+    }
     setDetailLoading(true)
     setSelectedNotification(notif)
 

@@ -118,6 +118,72 @@ describe('ManagerEvaluationHistoryPage', () => {
     expect(screen.getByText('8,00/10')).toBeInTheDocument()
   })
 
+  it('searches list and summary while typing, keeps applied filters and resets the page', async () => {
+    render(<MemoryRouter initialEntries={['/admin/quality/history?page=3&departmentId=3']}>
+      <ManagerEvaluationHistoryPage historyPath="/admin/quality/history" />
+    </MemoryRouter>)
+    await screen.findByText('NamHaiPham')
+    adminApi.getEvaluationHistory.mockClear()
+    adminApi.getEvaluationHistorySummary.mockClear()
+
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên hoặc mã nhân viên...'), {
+      target: { value: '  duong  ' },
+    })
+    expect(adminApi.getEvaluationHistory).not.toHaveBeenCalled()
+
+    await waitFor(() => expect(adminApi.getEvaluationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: 'duong', page: 0, departmentId: '3' }),
+    ))
+    expect(adminApi.getEvaluationHistorySummary).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: 'duong', departmentId: '3' }),
+    )
+  })
+
+  it('keeps draft filters while searching and clears the keyword when reset', async () => {
+    render(<MemoryRouter><ManagerEvaluationHistoryPage /></MemoryRouter>)
+    await screen.findByText('NamHaiPham')
+    fireEvent.click(screen.getByRole('button', { name: /Bộ lọc/i }))
+    await screen.findByRole('option', { name: 'Khoa Điều dưỡng' })
+    fireEvent.change(screen.getByLabelText('Lọc theo khoa phòng'), { target: { value: '7' } })
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên hoặc mã nhân viên...'), { target: { value: 'duong' } })
+
+    await waitFor(() => expect(adminApi.getEvaluationHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'duong', departmentId: undefined }),
+    ))
+    expect(screen.getByLabelText('Lọc theo khoa phòng')).toHaveValue('7')
+    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+    await waitFor(() => expect(adminApi.getEvaluationHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'duong', departmentId: '7' }),
+    ))
+
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên hoặc mã nhân viên...'), { target: { value: '' } })
+    await waitFor(() => expect(adminApi.getEvaluationHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: undefined, departmentId: '7' }),
+    ))
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo tên hoặc mã nhân viên...'), { target: { value: 'pending' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }))
+    expect(screen.getByPlaceholderText('Tìm theo tên hoặc mã nhân viên...')).toHaveValue('')
+    await waitFor(() => expect(adminApi.getEvaluationHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: undefined, departmentId: undefined }),
+    ))
+  })
+
+  it('does not get stuck loading when Enter repeats the current search', async () => {
+    render(<MemoryRouter><ManagerEvaluationHistoryPage /></MemoryRouter>)
+    await screen.findByText('NamHaiPham')
+    const search = screen.getByPlaceholderText('Tìm theo tên hoặc mã nhân viên...')
+    fireEvent.change(search, { target: { value: 'duong' } })
+    await waitFor(() => expect(adminApi.getEvaluationHistory).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'duong' }),
+    ))
+    await screen.findByText('NamHaiPham')
+
+    fireEvent.keyDown(search, { key: 'Enter' })
+
+    expect(screen.queryByText('Đang tải kết quả...')).not.toBeInTheDocument()
+    expect(screen.getByText('NamHaiPham')).toBeInTheDocument()
+  })
+
   it('allows filtering by department across all departments', async () => {
     render(
       <MemoryRouter>

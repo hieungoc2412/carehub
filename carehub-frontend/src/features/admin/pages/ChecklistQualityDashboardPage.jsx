@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../../shared/utils/searchText.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
@@ -176,6 +177,21 @@ function ChecklistQualityDashboardPage({ role = 'admin' }) {
     targetStatus,
     toDate,
   })
+
+  useEffect(() => {
+    const nextSearch = search.trim()
+    if (nextSearch === appliedRoleFilters.search) return undefined
+    const timer = window.setTimeout(() => {
+      setPage(0)
+      setFilteredSelectedFormId('')
+      setSelectedDetailForm(null)
+      setDetailError('')
+      setDetailLoading(false)
+      setTrendItems([])
+      setAppliedRoleFilters((current) => ({ ...current, search: nextSearch }))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [appliedRoleFilters.search, search])
 
   useEffect(() => {
     if (isAdmin || ownDepartmentId || departments.length > 0) return undefined
@@ -852,7 +868,7 @@ export function ComplianceTargetModal({ form, isAdmin, departments, currentDepar
   const normalizedDepartmentQuery = departmentQuery.trim().toLowerCase()
   const filteredDepartments = useMemo(() => {
     if (!normalizedDepartmentQuery) return departmentOptions
-    return departmentOptions.filter((item) => `${item.name} ${item.code || ''}`.toLowerCase().includes(normalizedDepartmentQuery))
+    return departmentOptions.filter((item) => matchesSearch(`${item.name} ${item.code || ''}`, normalizedDepartmentQuery))
   }, [departmentOptions, normalizedDepartmentQuery])
   const selectedDepartmentSet = useMemo(() => new Set(selectedDepartmentIds), [selectedDepartmentIds])
   const selectedDepartments = useMemo(

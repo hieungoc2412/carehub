@@ -1,3 +1,4 @@
+import { matchesSearch } from '../../../shared/utils/searchText.js'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -122,7 +123,7 @@ function matchesRetiredFilters(form, { departmentId, keyword }) {
 
   return [form.code, form.title, form.description]
     .filter(Boolean)
-    .some((value) => String(value).toLowerCase().includes(normalizedKeyword))
+    .some((value) => matchesSearch(String(value), normalizedKeyword))
 }
 
 function mergeCachedRetiredForms(forms, filters) {
@@ -191,6 +192,18 @@ function FormListPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [importMenuOpen, setImportMenuOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+
+  useEffect(() => {
+    const nextKeyword = resolveChecklistSearchKeyword(keyword.trim())
+    if (nextKeyword === appliedFilters.keyword) return undefined
+    const timer = window.setTimeout(() => {
+      setErrorMessage('')
+      setLoading(true)
+      setPage(1)
+      setAppliedFilters((current) => ({ ...current, keyword: nextKeyword }))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [appliedFilters.keyword, keyword])
 
   useEffect(() => {
     if (!isFilterOpen || departments.length > 0) return undefined

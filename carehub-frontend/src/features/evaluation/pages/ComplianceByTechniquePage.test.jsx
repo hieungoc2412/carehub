@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ComplianceByTechniquePage from './ComplianceByTechniquePage.jsx'
 
@@ -86,6 +86,68 @@ const openFilters = () => fireEvent.click(screen.getByRole('button', { name: 'B�
 const dateInputs = () => screen.getAllByDisplayValue(/^\d{4}-\d{2}-\d{2}$/)
 
 describe('ComplianceByTechniquePage - chế độ quản trị', () => {
+  it('tự tìm theo từ khóa khi nhập mà không cần áp dụng bộ lọc', async () => {
+    await renderAdmin()
+    competency.getByTechnique.mockClear()
+
+    fireEvent.change(screen.getByLabelText('Tìm theo tên nhân viên'), { target: { value: 'du' } })
+    fireEvent.change(screen.getByLabelText('Tìm theo tên nhân viên'), { target: { value: '  duong  ' } })
+    expect(competency.getByTechnique).not.toHaveBeenCalled()
+
+    await waitFor(() => expect(competency.getByTechnique).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: 'duong', page: 0 }),
+    ))
+    expect(competency.getByTechnique).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(screen.getByLabelText('Tìm theo tên nhân viên'), { target: { value: '' } })
+    await waitFor(() => expect(competency.getByTechnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: undefined }),
+    ))
+  })
+
+  it.each(['resolve', 'reject'])('bỏ qua phản hồi cũ đến muộn (%s)', async (completion) => {
+    let finishOldRequest
+    competency.getByTechnique.mockImplementation(({ keyword }) => {
+      if (keyword === 'cu') return new Promise((resolve, reject) => {
+        finishOldRequest = () => completion === 'resolve'
+          ? resolve(techniqueResponse([item(1, { employeeName: 'Kết quả cũ' })]))
+          : reject(new Error('Lỗi từ truy vấn cũ'))
+      })
+      return Promise.resolve(techniqueResponse([item(2, { employeeName: keyword ? 'Kết quả mới' : 'Nhân viên 1' })]))
+    })
+    await renderAdmin()
+    const search = screen.getByLabelText('Tìm theo tên nhân viên')
+    fireEvent.change(search, { target: { value: 'cu' } })
+    await waitFor(() => expect(finishOldRequest).toBeTypeOf('function'))
+    fireEvent.change(search, { target: { value: 'moi' } })
+    await screen.findByText('Kết quả mới')
+
+    await act(async () => finishOldRequest())
+
+    expect(screen.queryByText('Kết quả cũ')).not.toBeInTheDocument()
+    expect(screen.getByText('Kết quả mới')).toBeInTheDocument()
+    expect(showToast).not.toHaveBeenCalled()
+  })
+
+  it('tìm theo bộ lọc đã áp dụng và giữ lựa chọn khoa đang sửa', async () => {
+    await renderAdmin()
+    openFilters()
+    await screen.findByRole('option', { name: 'Khoa Ngoại' })
+    fireEvent.change(screen.getByLabelText('Khoa/phòng'), { target: { value: '3' } })
+    competency.getByTechnique.mockClear()
+
+    fireEvent.change(screen.getByLabelText('Tìm theo tên nhân viên'), { target: { value: 'duong' } })
+
+    await waitFor(() => expect(competency.getByTechnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'duong', departmentId: undefined }),
+    ))
+    expect(screen.getByLabelText('Khoa/phòng')).toHaveValue('3')
+    fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
+    await waitFor(() => expect(competency.getByTechnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({ keyword: 'duong', departmentId: '3' }),
+    ))
+  })
+
   it('tải dữ liệu toàn viện với khoảng ngày mặc định', async () => {
     await renderAdmin()
 
@@ -211,8 +273,6 @@ describe('ComplianceByTechniquePage - bộ lọc', () => {
     fireEvent.change(dateInputs()[0], { target: { value: `${THIS_YEAR}-03-01` } })
     fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }))
 
-    // departmentId và appliedFilters đổi trong cùng một nhịp nên effect chạy hai lần;
-    // lời gọi cuối không chắc là lời gọi mang đủ bộ lọc.
     await waitFor(() => expect(competency.getByTechnique).toHaveBeenCalledWith(expect.objectContaining({
       departmentId: '3', keyword: 'Nam', fromDate: `${THIS_YEAR}-03-01`,
     })), { timeout: 5000 })
